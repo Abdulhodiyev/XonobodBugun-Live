@@ -1,0 +1,58 @@
+{
+  "map_config": {
+    "default_center": [40.8028, 73.0009],
+    "default_zoom": 13
+  },
+  "settlements": [
+    {
+      "id": "xonobod",
+      "name_uz": "Xonobod",
+      "name_ru": "Ханабад",
+      "center_lat": 40.8028,
+      "center_lon": 73.0009,
+      "default_zoom": 13
+    },
+    {
+      "id": "sultonobod",
+      "name_uz": "Sultonobod",
+      "name_ru": "Султанабад",
+      "center_lat": 40.7672,
+      "center_lon": 72.9756,
+      "default_zoom": 14
+    }
+  ],
+  "mahallas": [
+    { "id": "xon_fitrat", "settlement": "xonobod", "name_uz": "A.Fitrat", "center": [40.799344, 72.996426] },
+    { "id": "xon_anxor", "settlement": "xonobod", "name_uz": "Anxor", "center": [40.796859, 72.986958] },
+    { "id": "xon_bunyodkor", "settlement": "xonobod", "name_uz": "Bunyodkor", "center": [40.813855, 72.968471] },
+    { "id": "xon_fozilmon", "settlement": "xonobod", "name_uz": "Fozilmon", "center": [40.815288, 72.9812] },
+    { "id": "xon_istiqlol", "settlement": "xonobod", "name_uz": "Istiqlol", "center": [40.804491, 72.995348] },
+    { "id": "xon_kampirrovot", "settlement": "xonobod", "name_uz": "Kampirrovot", "center": [40.77365, 73.036231] },
+    { "id": "xon_mehmonobod", "settlement": "xonobod", "name_uz": "Mehmonobod", "center": [40.819486, 72.995717] },
+    { "id": "xon_mustaqillik", "settlement": "xonobod", "name_uz": "Mustaqillik", "center": [40.797664, 73.002059] },
+    { "id": "xon_navoiy", "settlement": "xonobod", "name_uz": "Navoiy", "center": [40.817554, 72.975783] },
+    { "id": "xon_teyit", "settlement": "xonobod", "name_uz": "Teyit", "center": [40.793397, 73.009766] },
+    { "id": "xon_xidirsha", "settlement": "xonobod", "name_uz": "Xidirsha", "center": [40.831973, 73.020762] },
+    { "id": "xon_xonobod", "settlement": "xonobod", "name_uz": "Xonobod", "center": [40.801917, 72.973879] },
+    { "id": "xon_xontoq", "settlement": "xonobod", "name_uz": "Xontoq", "center": [40.80176, 72.985494] },
+    { "id": "xon_yangi_xayot", "settlement": "xonobod", "name_uz": "Yangi xayot", "center": [40.78743, 72.99498] },
+    { "id": "xon_yuksalish", "settlement": "xonobod", "name_uz": "Yuksalish", "center": [40.806306, 72.965605] },
+
+    { "id": "sul_xurobod", "settlement": "sultonobod", "name_uz": "Xurobod", "center": [40.755462, 72.964914] },
+    { "id": "sul_konchilik", "settlement": "sultonobod", "name_uz": "Konchilik", "center": [40.764879, 72.966461] },
+    { "id": "sul_sohibqiron", "settlement": "sultonobod", "name_uz": "Sohibqiron", "center": [40.761086, 72.973427] },
+    { "id": "sul_jannatmakon", "settlement": "sultonobod", "name_uz": "Jannatmakon", "center": [40.772463, 72.972739] },
+    { "id": "sul_buyuk_turon", "settlement": "sultonobod", "name_uz": "Buyuk Turon", "center": [40.768082, 72.988047] },
+    { "id": "sul_yangi_obod", "settlement": "sultonobod", "name_uz": "Yangi Obod", "center": [40.774359, 72.986499] },
+    { "id": "sul_jannatbuloq", "settlement": "sultonobod", "name_uz": "Jannatbuloq", "center": [40.773783, 72.977272] }
+  ],
+  "stations": [
+    { "id": "st_xon_metan_1", "settlement": "xonobod", "name_uz": "Metan (Anxor yaqini)", "fuel": "metan", "center": [40.796414, 72.985927] },
+    { "id": "st_xon_propan_1", "settlement": "xonobod", "name_uz": "Propan (Anxor yaqini)", "fuel": "propan", "center": [40.796507, 72.985123] },
+    { "id": "st_xon_benzin_1", "settlement": "xonobod", "name_uz": "Benzin (Xonobod #1)", "fuel": "benzin", "center": [40.794588, 72.991339] },
+    { "id": "st_xon_benzin_2", "settlement": "xonobod", "name_uz": "Benzin (Xonobod #2)", "fuel": "benzin", "center": [40.799692, 72.978505] },
+
+    { "id": "st_sul_benzin_1", "settlement": "sultonobod", "name_uz": "Benzin (Sultonobod)", "fuel": "benzin", "center": [40.764736, 72.959008] },
+    { "id": "st_sul_metan_sayilgoh", "settlement": "sultonobod", "name_uz": "Metan (Sayilgoh yo‘li)", "fuel": "metan", "center": [40.744399, 72.915244] }
+  ]
+}
