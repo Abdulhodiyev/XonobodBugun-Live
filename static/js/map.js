@@ -115,7 +115,6 @@ export function renderMarkers({ onMahallaClick, onStationClick }) {
         if (plannedInc) plannedCnt++;
       }
 
-      // Приоритет отображения маркера: confirmed > unconfirmed > planned > ok
       const primary = crowdInc || plannedInc;
 
       let color = '#10b981';
@@ -206,7 +205,7 @@ export function renderMarkers({ onMahallaClick, onStationClick }) {
     };
   }
 
-// Режим заправок (Metan / Propan / Benzin)
+  // Режим заправок (Metan / Propan / Benzin)
   let openCnt = 0;
   let queueCnt = 0;
   let longQueueCnt = 0;
@@ -264,6 +263,7 @@ export function renderMarkers({ onMahallaClick, onStationClick }) {
   return {
     summaryHtml: `⛽ <b>${openCnt}</b> bo‘sh · <b>${queueCnt}</b> o‘rtacha · <b>${longQueueCnt}</b> uzun · <b>${closedCnt}</b> yopiq`,
   };
+}
 
 /**
  * Конвертирует текущую конфигурацию обратно в строгий формат data/mahallas.json (совместимый с seed.py).
