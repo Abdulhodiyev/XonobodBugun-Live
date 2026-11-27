@@ -7,7 +7,7 @@ from app.core.cache import app_cache
 from app.core.config import settings
 from app.db.models import EventLog, Station, StationVote, utcnow
 
-VALID_STATION_STATUSES = {"open", "queue", "closed"}
+VALID_STATION_STATUSES = {"open", "queue", "long_queue", "closed"}
 
 
 async def submit_station_vote(

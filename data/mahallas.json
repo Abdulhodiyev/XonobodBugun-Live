@@ -47,10 +47,10 @@
     { "id": "sul_jannatbuloq", "settlement": "sultonobod", "name_uz": "Jannatbuloq", "center": [40.773783, 72.977272] }
   ],
   "stations": [
-    { "id": "st_xon_metan_1", "settlement": "xonobod", "name_uz": "Metan (Anxor yaqini)", "fuel": "metan", "center": [40.796414, 72.985927] },
-    { "id": "st_xon_propan_1", "settlement": "xonobod", "name_uz": "Propan (Anxor yaqini)", "fuel": "propan", "center": [40.796507, 72.985123] },
-    { "id": "st_xon_benzin_1", "settlement": "xonobod", "name_uz": "Benzin (Xonobod #1)", "fuel": "benzin", "center": [40.794588, 72.991339] },
-    { "id": "st_xon_benzin_2", "settlement": "xonobod", "name_uz": "Benzin (Xonobod #2)", "fuel": "benzin", "center": [40.799692, 72.978505] },
+    { "id": "st_xon_metan_1", "settlement": "xonobod", "name_uz": "Metan", "fuel": "metan", "center": [40.796414, 72.985927] },
+    { "id": "st_xon_propan_1", "settlement": "xonobod", "name_uz": "Propan", "fuel": "propan", "center": [40.796507, 72.985123] },
+    { "id": "st_xon_benzin_1", "settlement": "xonobod", "name_uz": "Benzin (1)", "fuel": "benzin", "center": [40.794588, 72.991339] },
+    { "id": "st_xon_benzin_2", "settlement": "xonobod", "name_uz": "Benzin (2)", "fuel": "benzin", "center": [40.799692, 72.978505] },
 
     { "id": "st_sul_benzin_1", "settlement": "sultonobod", "name_uz": "Benzin (Sultonobod)", "fuel": "benzin", "center": [40.764736, 72.959008] },
     { "id": "st_sul_metan_sayilgoh", "settlement": "sultonobod", "name_uz": "Metan (Sayilgoh yo‘li)", "fuel": "metan", "center": [40.744399, 72.915244] }

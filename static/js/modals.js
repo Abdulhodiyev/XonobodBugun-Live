@@ -114,19 +114,37 @@ export function openMahallaDetail(mh, incidentsList) {
   });
 }
 
-// --- Карточка заправки (с живым фото очереди на 1 час) ---
+// --- Карточка заправки (4 уровня очереди + свежесть + живое фото) ---
 export function openStationDetail(st, info) {
   const meta = FUEL_META[st.fuel] || { label: st.fuel };
   const sName = getSettlementName(st.settlement);
-  const currentTxt = info
-    ? `${STATION_STATUS_LABELS[info.status]} · ${formatLocalTime(info.created_at)} (${info.votes_count} ta ovoz)`
-    : '⚪ So‘nggi 1 soatda ma’lumot yo‘q';
+
+  const statusCard = info
+    ? `
+      <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 mb-3">
+        <div class="flex items-center justify-between gap-2 text-[11px] text-slate-500 mb-1">
+          <span>Hozirgi holat</span>
+          <span class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 font-semibold">
+            🕒 ${escapeHtml(formatTimeAgo(info.created_at))} yangilandi
+          </span>
+        </div>
+        <div class="text-base font-bold text-slate-900">${STATION_STATUS_LABELS[info.status] || escapeHtml(info.status)}</div>
+        <div class="text-[11px] text-slate-500 mt-1">
+          Soat ${formatLocalTime(info.created_at)} · ${info.votes_count} ta haydovchi tasdiqlagan
+        </div>
+      </div>
+    `
+    : `
+      <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 mb-3 text-xs text-slate-600">
+        ⚪ So‘nggi 1 soatda ma’lumot yo‘q — birinchi bo‘lib xabar bering!
+      </div>
+    `;
 
   const photoBlock = info?.photo_url
     ? `
       <div class="mb-4">
         <div class="text-[11px] font-semibold text-slate-500 mb-1.5">
-          📸 Jonli rasm (${formatLocalTime(info.photo_updated_at)} da yuklangan)
+          📸 Jonli navbat rasmi · ${escapeHtml(formatTimeAgo(info.photo_updated_at))} (${formatLocalTime(info.photo_updated_at)})
         </div>
         <img src="${escapeHtml(info.photo_url)}" alt="${escapeHtml(st.name_uz)}"
           class="w-full max-h-56 object-cover rounded-2xl border border-slate-200 shadow-sm" />
@@ -138,13 +156,12 @@ export function openStationDetail(st, info) {
     st.name_uz,
     `
       <div class="text-xs font-semibold text-slate-500 mb-2">${escapeHtml(sName)} · ${meta.label}</div>
-      <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 mb-3 text-xs">
-        Hozirgi holat: <div class="text-sm font-bold text-slate-800 mt-1">${currentTxt}</div>
-      </div>
+      ${statusCard}
       ${photoBlock}
-      <div class="space-y-2">
-        <button data-st-status="open" type="button" class="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs">🟢 Ishlayapti (navbatsiz)</button>
-        <button data-st-status="queue" type="button" class="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs">🟠 Navbat bor</button>
+      <div class="grid grid-cols-1 gap-2">
+        <button data-st-status="open" type="button" class="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs">🟢 Bo‘sh (&lt;15 daq)</button>
+        <button data-st-status="queue" type="button" class="w-full py-2.5 rounded-xl bg-yellow-500 hover:bg-yellow-600 text-white font-semibold text-xs">🟡 O‘rtacha (~30 daq)</button>
+        <button data-st-status="long_queue" type="button" class="w-full py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs">🟠 Uzun navbat (1 soat+)</button>
         <button data-st-status="closed" type="button" class="w-full py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-semibold text-xs">🔴 Yopiq / yoqilg‘i yo‘q</button>
       </div>
       <div class="text-[11px] text-slate-400 text-center mt-3">
@@ -157,60 +174,6 @@ export function openStationDetail(st, info) {
     const btn = e.target.closest('[data-st-status]');
     if (!btn) return;
     openBotDeepLink(`stset-${btn.dataset.stStatus}-${st.id}`);
-    closeModal();
-  });
-}
-
-// --- Нижняя кнопка (коммуналка -> переход в бота) ---
-export function openReportModal() {
-  if (!STATE.config) return;
-  const mhOpts = buildGroupedOptions(STATE.config.mahallas, m => `${m.name_uz} MFY`);
-
-  const body = openModal(
-    'Uzilish haqida xabar berish',
-    `
-      <div class="space-y-3.5">
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">Xizmat turi</label>
-          <select id="rep-util" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white">
-            <option value="power" ${STATE.utility === 'power' ? 'selected' : ''}>⚡ Chiroq (elektr)</option>
-            <option value="water" ${STATE.utility === 'water' ? 'selected' : ''}>💧 Suv</option>
-            <option value="gas" ${STATE.utility === 'gas' ? 'selected' : ''}>🔥 Gaz</option>
-          </select>
-        </div>
-        <div id="rep-gas-box" class="${STATE.utility === 'gas' ? '' : 'hidden'}">
-          <label class="block text-xs font-semibold text-slate-600 mb-1">Gaz holati</label>
-          <select id="rep-subtype" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white">
-            <option value="outage">Gaz umuman yo‘q</option>
-            <option value="low_pressure">Bosim juda past</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">Mahallangiz</label>
-          <select id="rep-mahalla" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white">${mhOpts}</select>
-        </div>
-        <button id="rep-submit" type="button"
-          class="w-full py-3 rounded-xl bg-[#2ca7f2] hover:bg-[#1e96e0] text-white font-semibold transition">
-          📍 Botda GPS bilan tasdiqlash →
-        </button>
-      </div>
-    `
-  );
-
-  if (STATE.settlement !== 'all') {
-    const first = STATE.config.mahallas.find(m => m.settlement === STATE.settlement);
-    if (first) body.querySelector('#rep-mahalla').value = first.id;
-  }
-
-  body.querySelector('#rep-util').addEventListener('change', e => {
-    body.querySelector('#rep-gas-box').classList.toggle('hidden', e.target.value !== 'gas');
-  });
-
-  body.querySelector('#rep-submit').addEventListener('click', () => {
-    const util = body.querySelector('#rep-util').value;
-    const mahallaId = body.querySelector('#rep-mahalla').value;
-    const subtype = util === 'gas' ? body.querySelector('#rep-subtype').value : 'outage';
-    openBotDeepLink(`rep-${util}-${subtype}-${mahallaId}`);
     closeModal();
   });
 }
@@ -232,8 +195,9 @@ export function openStationModal() {
           <select id="st-select" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white">${stOpts}</select>
         </div>
         <div class="grid grid-cols-1 gap-2">
-          <button data-st-status="open" type="button" class="py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs">🟢 Ishlayapti (navbatsiz)</button>
-          <button data-st-status="queue" type="button" class="py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs">🟠 Navbat bor</button>
+          <button data-st-status="open" type="button" class="py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs">🟢 Bo‘sh (&lt;15 daq)</button>
+          <button data-st-status="queue" type="button" class="py-2.5 rounded-xl bg-yellow-500 hover:bg-yellow-600 text-white font-semibold text-xs">🟡 O‘rtacha (~30 daq)</button>
+          <button data-st-status="long_queue" type="button" class="py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs">🟠 Uzun navbat (1 soat+)</button>
           <button data-st-status="closed" type="button" class="py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-semibold text-xs">🔴 Yopiq / yoqilg‘i yo‘q</button>
         </div>
       </div>

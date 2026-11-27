@@ -13,10 +13,21 @@ export const FUEL_META = {
 };
 
 export const STATION_STATUS_LABELS = {
-  open:   '🟢 Ishlayapti (navbatsiz)',
-  queue:  '🟠 Navbat bor',
-  closed: '🔴 Yopiq / yoqilg‘i yo‘q',
+  open:       '🟢 Bo‘sh (<15 daq)',
+  queue:      '🟡 O‘rtacha (~30 daq)',
+  long_queue: '🟠 Uzun navbat (1 soat+)',
+  closed:     '🔴 Yopiq / yoqilg‘i yo‘q',
 };
+
+export function formatTimeAgo(isoStr) {
+  if (!isoStr) return '';
+  const diffMin = Math.max(0, Math.floor((Date.now() - new Date(isoStr).getTime()) / 60000));
+  if (diffMin < 1) return 'Hozirgina';
+  if (diffMin < 60) return `${diffMin} daqiqa oldin`;
+  const hours = Math.floor(diffMin / 60);
+  const mins = diffMin % 60;
+  return mins > 0 ? `${hours} soat ${mins} daqiqa oldin` : `${hours} soat oldin`;
+}
 
 export const STATE = {
   config: null,

@@ -206,9 +206,10 @@ export function renderMarkers({ onMahallaClick, onStationClick }) {
     };
   }
 
-  // Режим заправок (Metan / Propan / Benzin)
+// Режим заправок (Metan / Propan / Benzin)
   let openCnt = 0;
   let queueCnt = 0;
+  let longQueueCnt = 0;
   let closedCnt = 0;
 
   for (const st of STATE.config.stations) {
@@ -221,7 +222,8 @@ export function renderMarkers({ onMahallaClick, onStationClick }) {
     let color = '#94a3b8';
     if (info) {
       if (info.status === 'open') { color = '#10b981'; if (inScope) openCnt++; }
-      else if (info.status === 'queue') { color = '#f59e0b'; if (inScope) queueCnt++; }
+      else if (info.status === 'queue') { color = '#eab308'; if (inScope) queueCnt++; }
+      else if (info.status === 'long_queue') { color = '#f97316'; if (inScope) longQueueCnt++; }
       else if (info.status === 'closed') { color = '#ef4444'; if (inScope) closedCnt++; }
     }
 
@@ -260,9 +262,8 @@ export function renderMarkers({ onMahallaClick, onStationClick }) {
   }
 
   return {
-    summaryHtml: `⛽ <b>${openCnt}</b> ochiq · <b>${queueCnt}</b> navbat · <b>${closedCnt}</b> yopiq`,
+    summaryHtml: `⛽ <b>${openCnt}</b> bo‘sh · <b>${queueCnt}</b> o‘rtacha · <b>${longQueueCnt}</b> uzun · <b>${closedCnt}</b> yopiq`,
   };
-}
 
 /**
  * Конвертирует текущую конфигурацию обратно в строгий формат data/mahallas.json (совместимый с seed.py).

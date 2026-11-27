@@ -1,5 +1,7 @@
 import asyncio
 import io
+from datetime import datetime, timezone
+
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandObject, CommandStart
@@ -37,10 +39,28 @@ from app.services.stats import get_active_state, get_geo_config
 router = Router()
 
 STATION_STATUS_LABELS = {
-    "open": "🟢 Ishlayapti (navbatsiz)",
-    "queue": "🟠 Navbat bor",
+    "open": "🟢 Bo‘sh (<15 daq)",
+    "queue": "🟡 O‘rtacha (~30 daq)",
+    "long_queue": "🟠 Uzun navbat (1 soat+)",
     "closed": "🔴 Yopiq / yoqilg‘i yo‘q",
 }
+
+
+def _format_ago_uz(iso_str: str | None) -> str:
+    if not iso_str:
+        return ""
+    try:
+        dt = datetime.fromisoformat(iso_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        mins = max(0, int((datetime.now(timezone.utc) - dt).total_seconds() // 60))
+        if mins < 1:
+            return "hozirgina"
+        if mins < 60:
+            return f"{mins} daq oldin"
+        return f"{mins // 60} soat oldin"
+    except ValueError:
+        return ""
 
 GPS_PROMPT_MAHALLA = (
     "📍 <b>Joylashuvni tasdiqlash</b>\n\n"
@@ -482,14 +502,19 @@ async def _render_stations_for_settlement(call: CallbackQuery, geo: dict, settle
 
     for st in stations:
         st_info = active_stations.get(st["id"])
-        dot = {"open": "🟢", "queue": "🟠", "closed": "🔴"}.get(
-            st_info["status"] if st_info else "", "⚪"
-        )
+        dot = {
+            "open": "🟢",
+            "queue": "🟡",
+            "long_queue": "🟠",
+            "closed": "🔴",
+        }.get(st_info["status"] if st_info else "", "⚪")
         fuel = FUEL_SHORT_UZ.get(st["fuel"], st["fuel"])
         cam = " 📷" if (st_info and st_info.get("photo_url")) else ""
+        ago = _format_ago_uz(st_info.get("created_at")) if st_info else ""
+        ago_txt = f" · {ago}" if ago else ""
         rows.append([
             InlineKeyboardButton(
-                text=f"{dot} {st['name_uz']} [{fuel}]{cam}",
+                text=f"{dot} {st['name_uz']} [{fuel}]{ago_txt}{cam}",
                 callback_data=f"st_pick:{st['id']}",
             )
         ])
@@ -550,8 +575,9 @@ async def cb_station_pick(call: CallbackQuery):
     fuel = FUEL_LABELS_UZ.get(st["fuel"], st["fuel"])
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🟢 Ishlayapti (navbatsiz)", callback_data=f"st_set:{station_id}:open")],
-            [InlineKeyboardButton(text="🟠 Navbat bor", callback_data=f"st_set:{station_id}:queue")],
+            [InlineKeyboardButton(text="🟢 Bo‘sh (<15 daq)", callback_data=f"st_set:{station_id}:open")],
+            [InlineKeyboardButton(text="🟡 O‘rtacha (~30 daq)", callback_data=f"st_set:{station_id}:queue")],
+            [InlineKeyboardButton(text="🟠 Uzun navbat (1 soat+)", callback_data=f"st_set:{station_id}:long_queue")],
             [InlineKeyboardButton(text="🔴 Yopiq / yoqilg‘i yo‘q", callback_data=f"st_set:{station_id}:closed")],
             [InlineKeyboardButton(text="⬅️ Zapravkalarga qaytish", callback_data=f"st_s:{st['settlement']}")],
         ]
@@ -798,9 +824,11 @@ async def cb_summary(call: CallbackQuery):
                 status_txt = STATION_STATUS_LABELS.get(
                     st_info["status"] if st_info else "", "⚪ Ma’lumot yo‘q"
                 )
+                ago = _format_ago_uz(st_info.get("created_at")) if st_info else ""
+                ago_txt = f" ({ago})" if ago else ""
                 cam = " 📸" if (st_info and st_info.get("photo_url")) else ""
                 fuel_short = FUEL_SHORT_UZ.get(st["fuel"], st["fuel"])
-                lines.append(f"• {st['name_uz']} [{fuel_short}]: {status_txt}{cam}")
+                lines.append(f"• {st['name_uz']} [{fuel_short}]: {status_txt}{ago_txt}{cam}")
 
     kb = InlineKeyboardMarkup(
         inline_keyboard=[

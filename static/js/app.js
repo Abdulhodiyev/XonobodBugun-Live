@@ -113,8 +113,9 @@ function renderUI() {
     cta.textContent = '⛽ Zapravka holatini yangilash';
     cta.className = 'pointer-events-auto w-full sm:w-auto sm:min-w-[270px] py-3 px-6 rounded-full bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-white font-semibold text-[14px] shadow-[0_6px_22px_rgba(16,185,129,0.4)] transition flex items-center justify-center gap-2 whitespace-nowrap';
     legend.innerHTML = `
-      <div class="flex items-center gap-2.5"><span class="w-3 h-3 rounded-full bg-emerald-500 shrink-0"></span> Ishlayapti</div>
-      <div class="flex items-center gap-2.5"><span class="w-3 h-3 rounded-full bg-amber-400 shrink-0"></span> Navbat bor</div>
+      <div class="flex items-center gap-2.5"><span class="w-3 h-3 rounded-full bg-emerald-500 shrink-0"></span> Bo‘sh (&lt;15 daq)</div>
+      <div class="flex items-center gap-2.5"><span class="w-3 h-3 rounded-full bg-yellow-500 shrink-0"></span> O‘rtacha (~30 daq)</div>
+      <div class="flex items-center gap-2.5"><span class="w-3 h-3 rounded-full bg-orange-500 shrink-0"></span> Uzun navbat (1 soat+)</div>
       <div class="flex items-center gap-2.5"><span class="w-3 h-3 rounded-full bg-rose-500 shrink-0"></span> Yopiq / yoqilg‘i yo‘q</div>
       <div class="flex items-center gap-2.5"><span class="w-3 h-3 rounded-full bg-slate-300 shrink-0"></span> Ma’lumot yo‘q</div>
     `;

@@ -16,4 +16,4 @@ class ResolveRequest(BaseModel):
 
 class StationVoteRequest(BaseModel):
     station_id: str = Field(..., min_length=2, max_length=60)
-    status: Literal["open", "queue", "closed"]
+    status: Literal["open", "queue", "closed", "long_queue"]

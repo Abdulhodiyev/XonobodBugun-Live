@@ -234,3 +234,12 @@ async def test_station_photo_save_and_meta(monkeypatch, tmp_path):
     meta = station_photos.get_fresh_photo_meta("st_metan_1")
     assert meta is not None
     assert meta["photo_url"].startswith("/api/stations/st_metan_1/photo?v=")
+
+
+async def test_station_long_queue_status(db_session):
+    d1 = hash_reporter("tg:701")
+    res = await submit_station_vote(db_session, "st_metan_1", "long_queue", d1, source="bot")
+    assert res["ok"] is True
+
+    statuses = await get_active_station_statuses(db_session)
+    assert statuses["st_metan_1"]["status"] == "long_queue"
