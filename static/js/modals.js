@@ -7,6 +7,7 @@ import {
   UTILITY_NAMES,
   escapeHtml,
   formatLocalTime,
+  formatTimeAgo,
   getSettlementName,
   openBotDeepLink,
 } from './state.js';
@@ -174,6 +175,60 @@ export function openStationDetail(st, info) {
     const btn = e.target.closest('[data-st-status]');
     if (!btn) return;
     openBotDeepLink(`stset-${btn.dataset.stStatus}-${st.id}`);
+    closeModal();
+  });
+}
+
+// --- Нижняя кнопка (коммуналка -> переход в бота) ---
+export function openReportModal() {
+  if (!STATE.config) return;
+  const mhOpts = buildGroupedOptions(STATE.config.mahallas, m => `${m.name_uz} MFY`);
+
+  const body = openModal(
+    'Uzilish haqida xabar berish',
+    `
+      <div class="space-y-3.5">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Xizmat turi</label>
+          <select id="rep-util" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white">
+            <option value="power" ${STATE.utility === 'power' ? 'selected' : ''}>⚡ Chiroq (elektr)</option>
+            <option value="water" ${STATE.utility === 'water' ? 'selected' : ''}>💧 Suv</option>
+            <option value="gas" ${STATE.utility === 'gas' ? 'selected' : ''}>🔥 Gaz</option>
+          </select>
+        </div>
+        <div id="rep-gas-box" class="${STATE.utility === 'gas' ? '' : 'hidden'}">
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Gaz holati</label>
+          <select id="rep-subtype" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white">
+            <option value="outage">Gaz umuman yo‘q</option>
+            <option value="low_pressure">Bosim juda past</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Mahallangiz</label>
+          <select id="rep-mahalla" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white">${mhOpts}</select>
+        </div>
+        <button id="rep-submit" type="button"
+          class="w-full py-3 rounded-xl bg-[#2ca7f2] hover:bg-[#1e96e0] text-white font-semibold transition">
+          📍 Botda GPS bilan tasdiqlash →
+        </button>
+      </div>
+    `
+  );
+
+  if (STATE.settlement !== 'all') {
+    const first = STATE.config.mahallas.find(m => m.settlement === STATE.settlement);
+    if (first) body.querySelector('#rep-mahalla').value = first.id;
+  }
+
+  body.querySelector('#rep-util').addEventListener('change', e => {
+    body.querySelector('#rep-gas-box').classList.toggle('hidden', e.target.value !== 'gas');
+  });
+
+  body.querySelector('#rep-submit').addEventListener('click', () => {
+    const util = body.querySelector('#rep-util').value;
+    const mahallaId = body.querySelector('#rep-mahalla').value;
+    const subtype = util === 'gas' ? body.querySelector('#rep-subtype').value : 'outage';
+    openBotDeepLink(`rep-${util}-${subtype}-${mahallaId}`);
     closeModal();
   });
 }
