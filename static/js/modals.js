@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from './api.js';
+import { apiGet } from './api.js';
 import {
   BOT_USERNAME,
   FUEL_META,
@@ -8,7 +8,7 @@ import {
   escapeHtml,
   formatLocalTime,
   getSettlementName,
-  showToast,
+  openBotDeepLink,
 } from './state.js';
 
 export function openModal(title, html) {
@@ -37,8 +37,8 @@ function buildGroupedOptions(items, labelBuilder) {
     .join('');
 }
 
-// --- Карточка махалли (поддерживает одновременные crowd + planned) ---
-export function openMahallaDetail(mh, incidentsList, onUpdated) {
+// --- Карточка махалли (отправка через Deep Link в бота) ---
+export function openMahallaDetail(mh, incidentsList) {
   const crowdInc = incidentsList.find(i => i.status !== 'planned') || null;
   const plannedInc = incidentsList.find(i => i.status === 'planned') || null;
   const settlementName = getSettlementName(mh.settlement);
@@ -58,21 +58,21 @@ export function openMahallaDetail(mh, incidentsList, onUpdated) {
   if (crowdInc) {
     const isConf = crowdInc.status === 'confirmed';
     const cls = isConf ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-amber-50 border-amber-200 text-amber-800';
-    const lbl = isConf ? '🔴 Avariya tasdiqlangan' : '🟠 Tasdiqlash kutilmoqda (yana 1 kishi kerak)';
+    const lbl = isConf ? '🔴 Avariya tasdiqlangan' : '🟠 Tekshirilmoqda (tasdiqlash uchun 4+ xabar kerak)';
     const sub = crowdInc.issue_subtype === 'low_pressure' ? ' · Bosim past' : '';
 
     html += `
       <div class="p-3.5 rounded-2xl border ${cls} mb-3">
         <div class="font-bold text-sm">${lbl}${sub}</div>
         <div class="text-xs mt-1.5 opacity-90">
-          Xabarlar soni: <b>${crowdInc.reports_count}</b> · Oxirgi xabar: ${formatLocalTime(crowdInc.last_report_at)}
+          Tasdiqlaganlar: <b>${crowdInc.reports_count}</b> kishi · Oxirgi xabar: ${formatLocalTime(crowdInc.last_report_at)}
         </div>
         ${crowdInc.street_hint ? `<div class="text-xs mt-1.5 font-medium">📍 Mo‘ljal: ${escapeHtml(crowdInc.street_hint)}</div>` : ''}
       </div>
       <div class="flex gap-2">
-        <button data-action="confirm" type="button"
-          class="flex-1 py-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-semibold text-xs transition">+ Tasdiqlash</button>
-        <button data-action="resolve" type="button"
+        <button data-bot-payload="rep-${STATE.utility}-${crowdInc.issue_subtype}-${mh.id}" type="button"
+          class="flex-1 py-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-semibold text-xs transition">📍 + Tasdiqlash</button>
+        <button data-bot-payload="res-${STATE.utility}-${mh.id}" type="button"
           class="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs transition">✓ Hal bo‘ldi</button>
       </div>
     `;
@@ -85,100 +85,84 @@ export function openMahallaDetail(mh, incidentsList, onUpdated) {
       `;
     }
     html += `
-      <div class="mb-3">
-        <label class="block text-xs font-medium text-slate-500 mb-1">Ko‘cha yoki mo‘ljal (ixtiyoriy)</label>
-        <input id="quick-hint" type="text" maxlength="160" placeholder="Masalan: Maktab taraf, 2-ko‘cha"
-          class="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:outline-none focus:border-sky-400" />
-      </div>
-      <button data-action="report-outage" type="button"
+      <button data-bot-payload="rep-${STATE.utility}-outage-${mh.id}" type="button"
         class="w-full py-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-semibold mb-2 transition">
-        Uzilish haqida xabar berish
+        📍 Bot orqali xabar berish (GPS)
       </button>
       ${STATE.utility === 'gas' ? `
-        <button data-action="report-low" type="button"
+        <button data-bot-payload="rep-gas-low_pressure-${mh.id}" type="button"
           class="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold transition">
-          📉 Gaz bosimi juda past
+          📉 Gaz bosimi past (botda)
         </button>
       ` : ''}
     `;
   }
 
+  html += `
+    <div class="text-[11px] text-slate-400 text-center mt-3">
+      🛡 Soxta xabarlardan himoya: GPS tekshiruvi + 2/4 kishi tasdiqlashi
+    </div>
+  `;
+
   const body = openModal(`${mh.name_uz} MFY`, html);
 
-  body.addEventListener('click', async e => {
-    const btn = e.target.closest('[data-action]');
+  body.addEventListener('click', e => {
+    const btn = e.target.closest('[data-bot-payload]');
     if (!btn) return;
-    const action = btn.dataset.action;
-    btn.disabled = true;
-
-    try {
-      let res;
-      if (action === 'confirm') {
-        res = await apiPost('/api/report', {
-          mahalla_id: mh.id,
-          utility_type: STATE.utility,
-          issue_subtype: crowdInc.issue_subtype,
-        });
-      } else if (action === 'resolve') {
-        res = await apiPost('/api/resolve', {
-          mahalla_id: mh.id,
-          utility_type: STATE.utility,
-        });
-      } else if (action === 'report-outage' || action === 'report-low') {
-        const hint = document.getElementById('quick-hint')?.value.trim() || '';
-        res = await apiPost('/api/report', {
-          mahalla_id: mh.id,
-          utility_type: STATE.utility,
-          issue_subtype: action === 'report-low' ? 'low_pressure' : 'outage',
-          street_hint: hint,
-        });
-      }
-      showToast(res?.message || 'Yuborildi');
-      closeModal();
-      await onUpdated();
-    } catch {
-      showToast('Xatolik yuz berdi, qayta urining');
-      btn.disabled = false;
-    }
+    openBotDeepLink(btn.dataset.botPayload);
+    closeModal();
   });
 }
 
-// --- Карточка заправки ---
-export function openStationDetail(st, info, onUpdated) {
+// --- Карточка заправки (с живым фото очереди на 1 час) ---
+export function openStationDetail(st, info) {
   const meta = FUEL_META[st.fuel] || { label: st.fuel };
   const sName = getSettlementName(st.settlement);
   const currentTxt = info
     ? `${STATION_STATUS_LABELS[info.status]} · ${formatLocalTime(info.created_at)} (${info.votes_count} ta ovoz)`
     : '⚪ So‘nggi 1 soatda ma’lumot yo‘q';
 
+  const photoBlock = info?.photo_url
+    ? `
+      <div class="mb-4">
+        <div class="text-[11px] font-semibold text-slate-500 mb-1.5">
+          📸 Jonli rasm (${formatLocalTime(info.photo_updated_at)} da yuklangan)
+        </div>
+        <img src="${escapeHtml(info.photo_url)}" alt="${escapeHtml(st.name_uz)}"
+          class="w-full max-h-56 object-cover rounded-2xl border border-slate-200 shadow-sm" />
+      </div>
+    `
+    : '';
+
   const body = openModal(
     st.name_uz,
     `
       <div class="text-xs font-semibold text-slate-500 mb-2">${escapeHtml(sName)} · ${meta.label}</div>
-      <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 mb-4 text-xs">
+      <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 mb-3 text-xs">
         Hozirgi holat: <div class="text-sm font-bold text-slate-800 mt-1">${currentTxt}</div>
       </div>
+      ${photoBlock}
       <div class="space-y-2">
         <button data-st-status="open" type="button" class="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs">🟢 Ishlayapti (navbatsiz)</button>
         <button data-st-status="queue" type="button" class="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs">🟠 Navbat bor</button>
         <button data-st-status="closed" type="button" class="w-full py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-semibold text-xs">🔴 Yopiq / yoqilg‘i yo‘q</button>
       </div>
+      <div class="text-[11px] text-slate-400 text-center mt-3">
+        📍 Holat va navbat rasmi Telegram-botda GPS orqali tasdiqlanadi
+      </div>
     `
   );
 
-  body.addEventListener('click', async e => {
+  body.addEventListener('click', e => {
     const btn = e.target.closest('[data-st-status]');
     if (!btn) return;
-    btn.disabled = true;
-    const res = await apiPost('/api/station', { station_id: st.id, status: btn.dataset.stStatus });
-    showToast(res.message || 'Yangilandi');
+    openBotDeepLink(`stset-${btn.dataset.stStatus}-${st.id}`);
     closeModal();
-    await onUpdated();
   });
 }
 
-// --- Форма отправки жалобы ---
-export function openReportModal(onUpdated) {
+// --- Нижняя кнопка (коммуналка -> переход в бота) ---
+export function openReportModal() {
   if (!STATE.config) return;
   const mhOpts = buildGroupedOptions(STATE.config.mahallas, m => `${m.name_uz} MFY`);
 
@@ -205,25 +189,14 @@ export function openReportModal(onUpdated) {
           <label class="block text-xs font-semibold text-slate-600 mb-1">Mahallangiz</label>
           <select id="rep-mahalla" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white">${mhOpts}</select>
         </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">Ko‘cha yoki mo‘ljal (ixtiyoriy)</label>
-          <input id="rep-hint" type="text" maxlength="160" placeholder="Masalan: Maktab yaqini"
-            class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white" />
-        </div>
         <button id="rep-submit" type="button"
           class="w-full py-3 rounded-xl bg-[#2ca7f2] hover:bg-[#1e96e0] text-white font-semibold transition">
-          Xabar yuborish
+          📍 Botda GPS bilan tasdiqlash →
         </button>
-        <div class="text-center pt-1">
-          <a href="https://t.me/${BOT_USERNAME}" target="_blank" class="text-xs font-medium text-sky-600 hover:underline">
-            Yoki Telegram-bot orqali yuborish →
-          </a>
-        </div>
       </div>
     `
   );
 
-  // По умолчанию выбираем первую махаллю текущего активного города
   if (STATE.settlement !== 'all') {
     const first = STATE.config.mahallas.find(m => m.settlement === STATE.settlement);
     if (first) body.querySelector('#rep-mahalla').value = first.id;
@@ -233,30 +206,17 @@ export function openReportModal(onUpdated) {
     body.querySelector('#rep-gas-box').classList.toggle('hidden', e.target.value !== 'gas');
   });
 
-  body.querySelector('#rep-submit').addEventListener('click', async e => {
-    const btn = e.currentTarget;
-    btn.disabled = true;
+  body.querySelector('#rep-submit').addEventListener('click', () => {
     const util = body.querySelector('#rep-util').value;
     const mahallaId = body.querySelector('#rep-mahalla').value;
     const subtype = util === 'gas' ? body.querySelector('#rep-subtype').value : 'outage';
-    const hint = body.querySelector('#rep-hint').value.trim();
-
-    const res = await apiPost('/api/report', {
-      mahalla_id: mahallaId,
-      utility_type: util,
-      issue_subtype: subtype,
-      street_hint: hint,
-    });
-    showToast(res.message || 'Yuborildi');
+    openBotDeepLink(`rep-${util}-${subtype}-${mahallaId}`);
     closeModal();
-    STATE.mode = 'utilities';
-    STATE.utility = util;
-    await onUpdated();
   });
 }
 
-// --- Форма обновления заправки ---
-export function openStationModal(onUpdated) {
+// --- Нижняя кнопка (заправки -> переход в бота) ---
+export function openStationModal() {
   if (!STATE.config) return;
   const stOpts = buildGroupedOptions(
     STATE.config.stations,
@@ -285,15 +245,12 @@ export function openStationModal(onUpdated) {
     if (first) body.querySelector('#st-select').value = first.id;
   }
 
-  body.addEventListener('click', async e => {
+  body.addEventListener('click', e => {
     const btn = e.target.closest('[data-st-status]');
     if (!btn) return;
-    btn.disabled = true;
     const stationId = body.querySelector('#st-select').value;
-    const res = await apiPost('/api/station', { station_id: stationId, status: btn.dataset.stStatus });
-    showToast(res.message || 'Yangilandi');
+    openBotDeepLink(`stset-${btn.dataset.stStatus}-${stationId}`);
     closeModal();
-    await onUpdated();
   });
 }
 
@@ -430,10 +387,10 @@ export function openFaqModal() {
     'Savol-javob',
     `
       <div class="space-y-3 text-xs leading-relaxed">
-        <div><b>Xonobod Bugun qanday ishlaydi?</b><br>Xonobod va Sultonobod aholisi sayt yoki Telegram-bot orqali chiroq, suv, gaz uzilishi hamda metan/propan/benzin zapravkalar holatini belgilaydi.</div>
-        <div><b>Ranglar nimani anglatadi?</b><br>🟠 1 kishi xabar bersa — tasdiqlash kutilmoqda.<br>🔴 2 va undan ko‘p kishi tasdiqlasa — avariya tasdiqlangan.<br>🟣 Rejali texnik ishlar (faqat admin yopadi).</div>
-        <div><b>Belgi qancha vaqt turadi?</b><br>Chiroq — 3 soat, suv va gaz — 6 soat, zapravka holati — 1 soatdan so‘ng avtomatik yopiladi.</div>
-        <div><b>Shaxsiy ma’lumotlar saqlanadimi?</b><br>Yo‘q, telefon raqami yoki ism yig‘ilmaydi. Bu norasmiy jamoaviy xarita — avariya vaqtida 1055 ga ham qo‘ng‘iroq qiling.</div>
+        <div><b>Soxta xabarlardan qanday himoyalangan?</b><br>Har bir xabar Telegram-botda GPS (2 km radius) orqali tekshiriladi. Joylashuvingiz bazada saqlanmaydi.</div>
+        <div><b>Ranglar nimani anglatadi?</b><br>🟢 1 kishi xabar bersa — xaritada hali ko‘rinmaydi (kutiladi).<br>🟠 2–3 kishi xabar bersa — tekshirilmoqda.<br>🔴 4 va undan ko‘p kishi tasdiqlasa — avariya tasdiqlangan.<br>🟣 Rejali texnik ishlar (faqat admin yopadi).</div>
+        <div><b>Zapravkalar va rasmlar:</b><br>Haydovchilar zapravka holatini va navbat rasmini yuklashi mumkin. Holat va rasm 1 soatdan keyin avtomatik o‘chadi.</div>
+        <div><b>Shaxsiy ma’lumotlar saqlanadimi?</b><br>Yo‘q, telefon raqami ham, aniq GPS koordinata ham saqlanmaydi. Favqulodda holatlarda 1055 ga qo‘ng‘iroq qiling.</div>
       </div>
     `
   );

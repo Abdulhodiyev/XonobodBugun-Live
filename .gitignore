@@ -167,3 +167,4 @@ cython_debug/
 *.db-shm
 backups/
 .DS_Store
+uploads/

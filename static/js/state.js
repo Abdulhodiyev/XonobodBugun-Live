@@ -1,4 +1,4 @@
-export const BOT_USERNAME = 'xonobodbugun_bot'; // <- поменяй на username своего бота
+export const BOT_USERNAME = 'xonobodbugun_bot';
 
 export const UTILITY_NAMES = {
   power: '⚡ Chiroq',
@@ -64,4 +64,17 @@ export function getSettlementName(settlementId) {
   if (settlementId === 'all') return 'Barcha hududlar';
   const found = (STATE.config?.settlements || []).find(s => s.id === settlementId);
   return found ? found.name_uz : settlementId;
+}
+
+export function openBotDeepLink(payload = '') {
+  const url = payload
+    ? `https://t.me/${BOT_USERNAME}?start=${encodeURIComponent(payload)}`
+    : `https://t.me/${BOT_USERNAME}`;
+
+  const tgWebApp = window.Telegram?.WebApp;
+  if (tgWebApp && tgWebApp.initData && typeof tgWebApp.openTelegramLink === 'function') {
+    tgWebApp.openTelegramLink(url);
+    return;
+  }
+  window.open(url, '_blank', 'noopener');
 }

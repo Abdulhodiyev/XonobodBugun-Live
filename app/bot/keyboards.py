@@ -1,4 +1,4 @@
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, KeyboardButton, ReplyKeyboardMarkup
 from app.core.config import settings
 
 
@@ -86,4 +86,20 @@ def admin_menu_kb() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="🔄 JSON dan yangilash", callback_data="adm:reload_seed")],
             [InlineKeyboardButton(text="⬅️ Asosiy menyu", callback_data="menu:home")],
         ]
+    )
+
+
+def location_request_kb(is_admin: bool = False) -> ReplyKeyboardMarkup:
+    rows = [[KeyboardButton(text="📍 Joylashuvni yuborish", request_location=True)]]
+    if is_admin:
+        rows.append([KeyboardButton(text="⚡ Admin: GPS tekshiruvisiz")])
+    rows.append([KeyboardButton(text="❌ Bekor qilish")])
+    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True, one_time_keyboard=True)
+
+
+def cancel_reply_kb() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="❌ Bekor qilish")]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
     )

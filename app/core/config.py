@@ -58,6 +58,14 @@ class Settings(BaseSettings):
             "gas": self.ttl_gas_hours,
         }[utility_type]
 
+    orange_threshold: int = Field(default=2, alias="ORANGE_THRESHOLD")
+    red_threshold: int = Field(default=4, alias="RED_THRESHOLD")
+    quorum_window_power_min: int = Field(default=45, alias="QUORUM_WINDOW_POWER_MIN")
+    quorum_window_other_min: int = Field(default=60, alias="QUORUM_WINDOW_OTHER_MIN")
+    gps_mahalla_radius_km: float = Field(default=2.0, alias="GPS_MAHALLA_RADIUS_KM")
+    gps_station_radius_km: float = Field(default=2.0, alias="GPS_STATION_RADIUS_KM")
+    station_photo_ttl_min: int = Field(default=60, alias="STATION_PHOTO_TTL_MIN")
+
 
 settings = Settings()
 

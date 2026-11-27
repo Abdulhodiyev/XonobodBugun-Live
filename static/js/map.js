@@ -131,13 +131,13 @@ export function renderMarkers({ onMahallaClick, onStationClick }) {
           ringColor = '#ef4444';
           pulse = 'marker-pulse';
           size = 24;
-          innerTxt = String(primary.reports_count || 2);
+          innerTxt = String(primary.reports_count || 4);
           labelExtra = 'mahalla-label-alert';
         } else if (primary.status === 'unconfirmed') {
           color = '#f59e0b';
           ringColor = '#f59e0b';
           size = 20;
-          innerTxt = String(primary.reports_count || 1);
+          innerTxt = String(primary.reports_count || 2);
           labelExtra = 'mahalla-label-warn';
         } else if (primary.status === 'planned') {
           color = '#8b5cf6';
@@ -226,18 +226,27 @@ export function renderMarkers({ onMahallaClick, onStationClick }) {
     }
 
     const meta = FUEL_META[st.fuel] || { badge: '?', short: st.fuel };
+    const camBadge = info?.photo_url
+      ? '<span style="position:absolute;top:-5px;right:-6px;font-size:11px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));">📷</span>'
+      : '';
+
     const icon = L.divIcon({
       className: '',
       html: `
         <div class="marker-wrap" style="display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-50%);cursor:pointer;">
-          <div style="width:27px;height:27px;border-radius:9999px;background:${color};border:2px solid #fff;box-shadow:0 2px 8px rgba(15,23,42,0.3);color:#fff;font-weight:800;font-size:11.5px;display:flex;align-items:center;justify-content:center;">${meta.badge}</div>
+          <div style="position:relative;width:27px;height:27px;border-radius:9999px;background:${color};border:2px solid #fff;box-shadow:0 2px 8px rgba(15,23,42,0.3);color:#fff;font-weight:800;font-size:11.5px;display:flex;align-items:center;justify-content:center;">${meta.badge}${camBadge}</div>
           <div class="mahalla-label" style="margin-top:2px;">${escapeHtml(st.name_uz)}</div>
         </div>
       `,
       iconSize: [0, 0],
     });
 
-    const marker = L.marker(st.center, { icon, draggable: STATE.editMode }).addTo(map);
+    const marker = L.marker(st.center, {
+      icon,
+      draggable: STATE.editMode,
+      zIndexOffset: info ? 300 : 0,
+    }).addTo(map);
+
     if (STATE.editMode) {
       marker.on('dragend', e => {
         const p = e.target.getLatLng();

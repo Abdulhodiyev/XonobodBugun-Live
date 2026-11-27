@@ -1,11 +1,12 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import app_cache
 from app.core.config import UTILITY_LABELS_UZ, settings
 from app.db.models import EventLog, Incident, Mahalla, Report, utcnow
+from app.services.station_photos import cleanup_expired_station_photos
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ def _actor_key(source: str, reporter_hash: str, ip_hash: str) -> str:
     """
     Уникальный ключ для подсчёта кворума:
     - Telegram-бот подтверждён аккаунтом -> уникален по reporter_hash
-    - Веб без авторизации -> уникален по ip_hash (защита от Инкогнито)
+    - Веб без авторизации -> уникален по ip_hash
     """
     if source == "web" and ip_hash:
         return f"web_ip:{ip_hash}"
@@ -33,17 +34,23 @@ async def cleanup_expired(session: AsyncSession) -> int:
     stmt = (
         update(Incident)
         .where(
-            Incident.status.in_(["unconfirmed", "confirmed", "planned"]),
+            Incident.status.in_(["pending", "unconfirmed", "confirmed", "planned"]),
             Incident.expires_at <= now,
         )
         .values(status="closed", closed_at=now, close_reason="timeout")
     )
     res = await session.execute(stmt)
     await session.commit()
+
     closed_count = res.rowcount or 0
-    if closed_count > 0:
+    removed_photos = cleanup_expired_station_photos()
+
+    if closed_count > 0 or removed_photos > 0:
         app_cache.invalidate("state", "stats")
-        logger.info("Muddati tugagan uzilishlar yopildi: %d", closed_count)
+        if closed_count > 0:
+            logger.info("Muddati tugagan uzilishlar yopildi: %d", closed_count)
+        if removed_photos > 0:
+            logger.info("Eski zapravka rasmlari o‘chirildi: %d", removed_photos)
     return closed_count
 
 
@@ -52,7 +59,7 @@ async def submit_outage_report(
     mahalla_id: str,
     utility_type: str,
     reporter_hash: str,
-    source: str = "web",
+    source: str = "bot",
     issue_subtype: str = "outage",
     ip_hash: str = "",
     street_hint: str = "",
@@ -68,7 +75,13 @@ async def submit_outage_report(
 
     now = utcnow()
     hint = _clean_hint(street_hint)
-    expires_at = now + timedelta(hours=settings.ttl_hours_for(utility_type))
+    window_min = (
+        settings.quorum_window_power_min
+        if utility_type == "power"
+        else settings.quorum_window_other_min
+    )
+    full_expires_at = now + timedelta(hours=settings.ttl_hours_for(utility_type))
+    pending_expires_at = now + timedelta(minutes=window_min)
     rate_limit_since = now - timedelta(minutes=settings.rate_limit_minutes)
 
     # 1. Rate-limit по reporter_hash на эту махаллю и ресурс
@@ -92,13 +105,13 @@ async def submit_outage_report(
             "message": f"Siz yaqinda xabar yuborgansiz. {settings.rate_limit_minutes} daqiqadan so‘ng qayta urinishingiz mumkin.",
         }
 
-    # 2. Ищем активный народный инцидент (плановые идут отдельно и не мешают)
+    # 2. Ищем активный народный инцидент (включая скрытый pending в окне кворума)
     inc_stmt = (
         select(Incident)
         .where(
             Incident.mahalla_id == mahalla_id,
             Incident.utility_type == utility_type,
-            Incident.status.in_(["unconfirmed", "confirmed"]),
+            Incident.status.in_(["pending", "unconfirmed", "confirmed"]),
             Incident.expires_at > now,
         )
         .order_by(Incident.id.desc())
@@ -107,17 +120,21 @@ async def submit_outage_report(
     incident = (await session.execute(inc_stmt)).scalar_one_or_none()
 
     if incident is None:
+        is_pending = settings.orange_threshold > 1
+        initial_status = "pending" if is_pending else "unconfirmed"
+        initial_expires = pending_expires_at if is_pending else full_expires_at
+
         incident = Incident(
             mahalla_id=mahalla_id,
             utility_type=utility_type,
             issue_subtype=issue_subtype,
             source=source,
-            status="unconfirmed",
+            status=initial_status,
             street_hint=hint,
             reports_count=1,
             created_at=now,
             last_report_at=now,
-            expires_at=expires_at,
+            expires_at=initial_expires,
         )
         session.add(incident)
         await session.flush()
@@ -133,34 +150,45 @@ async def submit_outage_report(
                 created_at=now,
             )
         )
-        details = "Bosim past" if issue_subtype == "low_pressure" else ""
-        if hint:
-            details = f"{details} · {hint}".strip(" ·")
 
-        session.add(
-            EventLog(
-                category=utility_type,
-                target_id=mahalla_id,
-                target_name=f"{mahalla.name_uz} MFY",
-                event_type="reported",
-                source=source,
-                details=details,
-                created_at=now,
+        # В публичную ленту событий пишем только когда инцидент виден на карте
+        if not is_pending:
+            details = "Bosim past" if issue_subtype == "low_pressure" else ""
+            if hint:
+                details = f"{details} · {hint}".strip(" ·")
+            session.add(
+                EventLog(
+                    category=utility_type,
+                    target_id=mahalla_id,
+                    target_name=f"{mahalla.name_uz} MFY",
+                    event_type="reported",
+                    source=source,
+                    details=details,
+                    created_at=now,
+                )
             )
-        )
+
         await session.commit()
         app_cache.invalidate("state", "stats")
+
+        need_orange = max(0, settings.orange_threshold - 1)
+        msg = (
+            f"✅ Xabaringiz qabul qilindi! Yana {need_orange} kishi tasdiqlasa, "
+            "xaritada (to‘q sariq) ko‘rinadi."
+            if is_pending
+            else "🟠 Xabaringiz xaritada ko‘rindi. Boshqa aholidan tasdiq kutilmoqda."
+        )
         return {
             "ok": True,
             "incident_id": incident.id,
-            "status": "unconfirmed",
+            "status": initial_status,
             "reports_count": 1,
             "became_confirmed": False,
             "mahalla_name": mahalla.name_uz,
-            "message": "Xabaringiz qabul qilindi! Yana 1 kishi tasdiqlasa, xaritada qizil yonadi.",
+            "message": msg,
         }
 
-    # 3. Инцидент уже существует — добавляем репорт и пересчитываем уникальных акторов
+    # 3. Инцидент уже существует — добавляем голос и пересчитываем уникальных пользователей
     session.add(
         Report(
             incident_id=incident.id,
@@ -185,13 +213,21 @@ async def submit_outage_report(
     unique_actors = {_actor_key(src, rh, ih) for src, rh, ih in rep_rows}
     unique_count = len(unique_actors)
 
-    new_status = "confirmed" if unique_count >= 2 else "unconfirmed"
-    became_confirmed = incident.status != "confirmed" and new_status == "confirmed"
+    old_status = incident.status
+    if unique_count >= settings.red_threshold:
+        new_status = "confirmed"
+    elif unique_count >= settings.orange_threshold:
+        new_status = "unconfirmed"
+    else:
+        new_status = "pending"
+
+    became_visible = old_status == "pending" and new_status in {"unconfirmed", "confirmed"}
+    became_confirmed = old_status != "confirmed" and new_status == "confirmed"
 
     incident.status = new_status
     incident.reports_count = unique_count
     incident.last_report_at = now
-    incident.expires_at = expires_at
+    incident.expires_at = pending_expires_at if new_status == "pending" else full_expires_at
     if hint:
         incident.street_hint = hint
 
@@ -210,16 +246,50 @@ async def submit_outage_report(
                 created_at=now,
             )
         )
+    elif became_visible:
+        details = "Bosim past" if incident.issue_subtype == "low_pressure" else f"{unique_count} kishi"
+        if incident.street_hint:
+            details += f" · {incident.street_hint}"
+        session.add(
+            EventLog(
+                category=utility_type,
+                target_id=mahalla_id,
+                target_name=f"{mahalla.name_uz} MFY",
+                event_type="reported",
+                source=source,
+                details=details,
+                created_at=now,
+            )
+        )
 
     await session.commit()
     app_cache.invalidate("state", "stats")
 
     if became_confirmed:
-        msg = "Uzilish tasdiqlandi! Xaritada qizil belgi yoqildi."
+        msg = (
+            f"🔴 Avariya tasdiqlangan ({unique_count} ta xabar)! "
+            "Obunachilarga ogohlantirish yuborildi."
+        )
+    elif became_visible:
+        need_red = max(0, settings.red_threshold - unique_count)
+        msg = (
+            f"🟠 Xaritada ko‘rindi ({unique_count} ta xabar). "
+            f"Yana {need_red} kishi tasdiqlasa, avariya qizil (tasdiqlangan) bo‘ladi."
+        )
+    elif new_status == "pending":
+        need_orange = max(0, settings.orange_threshold - unique_count)
+        msg = (
+            f"✅ Qabul qilindi ({unique_count}/{settings.orange_threshold}). "
+            f"Yana {need_orange} kishi tasdiqlasa, xaritada ko‘rinadi."
+        )
     elif new_status == "unconfirmed":
-        msg = "Xabaringiz qo‘shildi, lekin tasdiqlash uchun boshqa foydalanuvchi xabari kerak."
+        need_red = max(0, settings.red_threshold - unique_count)
+        msg = (
+            f"🟠 Tasdiqlandi ({unique_count}/{settings.red_threshold}). "
+            f"Yana {need_red} kishi tasdiqlasa, qizil (tasdiqlangan) bo‘ladi."
+        )
     else:
-        msg = "Tasdiqlaganingiz uchun rahmat! Ma’lumot yangilandi."
+        msg = f"🔴 Avariya tasdiqlangan ({unique_count} ta xabar). Rahmat!"
 
     return {
         "ok": True,
@@ -237,7 +307,7 @@ async def submit_resolve(
     mahalla_id: str,
     utility_type: str,
     reporter_hash: str,
-    source: str = "web",
+    source: str = "bot",
     ip_hash: str = "",
     force_admin: bool = False,
 ) -> dict:
@@ -246,7 +316,11 @@ async def submit_resolve(
         return {"ok": False, "closed": False, "message": "Mahalla topilmadi."}
 
     now = utcnow()
-    allowed_statuses = ["unconfirmed", "confirmed", "planned"] if force_admin else ["unconfirmed", "confirmed"]
+    allowed_statuses = (
+        ["pending", "unconfirmed", "confirmed", "planned"]
+        if force_admin
+        else ["pending", "unconfirmed", "confirmed"]
+    )
 
     inc_stmt = (
         select(Incident)
@@ -262,7 +336,6 @@ async def submit_resolve(
     incident = (await session.execute(inc_stmt)).scalar_one_or_none()
 
     if incident is None:
-        # Проверяем, не пытается ли обычный пользователь закрыть плановое отключение
         if not force_admin:
             planned_check = (
                 select(Incident.id)
@@ -330,7 +403,8 @@ async def submit_resolve(
     ).all()
     resolve_votes = len({_actor_key(src, rh, ih) for src, rh, ih in res_rows})
 
-    should_close = force_admin or incident.status == "unconfirmed" or resolve_votes >= 2
+    was_visible = incident.status != "pending"
+    should_close = force_admin or incident.status in {"pending", "unconfirmed"} or resolve_votes >= 2
 
     if should_close:
         incident.status = "closed"
@@ -338,22 +412,25 @@ async def submit_resolve(
         incident.closed_at = now
         incident.close_reason = "admin" if force_admin else "user_restored"
 
-        session.add(
-            EventLog(
-                category=utility_type,
-                target_id=mahalla_id,
-                target_name=f"{mahalla.name_uz} MFY",
-                event_type="restored",
-                source=source,
-                details="",
-                created_at=now,
+        # В публичную ленту и рассылку пишем только если инцидент был виден на карте
+        if was_visible:
+            session.add(
+                EventLog(
+                    category=utility_type,
+                    target_id=mahalla_id,
+                    target_name=f"{mahalla.name_uz} MFY",
+                    event_type="restored",
+                    source=source,
+                    details="",
+                    created_at=now,
+                )
             )
-        )
+
         await session.commit()
         app_cache.invalidate("state", "stats")
         return {
             "ok": True,
-            "closed": True,
+            "closed": was_visible,
             "mahalla_name": mahalla.name_uz,
             "message": "Ajoyib! Uzilish xaritadan olib tashlandi.",
         }
@@ -389,7 +466,6 @@ async def create_planned_outage(
     expires_at = now + timedelta(hours=duration_hours)
     clean_note = (note or "Rejali texnik ishlar").strip()[:300]
 
-    # Проверяем, нет ли уже активного планового отключения — обновляем вместо дубля
     existing = (
         await session.execute(
             select(Incident)

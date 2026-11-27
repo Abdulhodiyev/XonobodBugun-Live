@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta, timezone
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import app_cache
 from app.core.config import settings
 from app.db.models import EventLog, Incident, Mahalla, Settlement, Station, utcnow
+from app.services.station_photos import get_fresh_photo_meta
 from app.services.stations import get_active_station_statuses
 from app.services.weather import get_xonobod_weather
 
@@ -120,6 +121,11 @@ async def get_active_state(session: AsyncSession, include_weather: bool = True) 
     ]
 
     stations = await get_active_station_statuses(session)
+    for st_id, st_data in stations.items():
+        photo_meta = get_fresh_photo_meta(st_id)
+        if photo_meta:
+            st_data.update(photo_meta)
+
     state = {
         "incidents": incidents,
         "stations": stations,
@@ -182,6 +188,12 @@ async def get_stats(session: AsyncSession, settlement_id: str | None = None) -> 
     day_ago = now - timedelta(hours=24)
     week_ago = now - timedelta(days=7)
 
+    # Одиночные неподтверждённые pending-сигналы не попадают в публичную статистику
+    visible_filter = or_(
+        Incident.status == "planned",
+        Incident.reports_count >= settings.orange_threshold,
+    )
+
     # 1. Активные по категориям
     active_stmt = select(Incident.utility_type, func.count(Incident.id)).where(
         Incident.status.in_(["unconfirmed", "confirmed", "planned"]),
@@ -195,7 +207,10 @@ async def get_stats(session: AsyncSession, settlement_id: str | None = None) -> 
     active_by_type = {u: c for u, c in active_rows}
 
     # 2. За 24 часа + по часам
-    recent_stmt = select(Incident.created_at).where(Incident.created_at >= day_ago)
+    recent_stmt = select(Incident.created_at).where(
+        Incident.created_at >= day_ago,
+        visible_filter,
+    )
     if settlement_id:
         recent_stmt = recent_stmt.join(Mahalla, Mahalla.id == Incident.mahalla_id).where(
             Mahalla.settlement_id == settlement_id
@@ -211,7 +226,10 @@ async def get_stats(session: AsyncSession, settlement_id: str | None = None) -> 
     top_stmt = (
         select(Incident.mahalla_id, Mahalla.name_uz, func.count(Incident.id).label("cnt"))
         .join(Mahalla, Mahalla.id == Incident.mahalla_id)
-        .where(Incident.created_at >= week_ago)
+        .where(
+            Incident.created_at >= week_ago,
+            visible_filter,
+        )
     )
     if settlement_id:
         top_stmt = top_stmt.where(Mahalla.settlement_id == settlement_id)
@@ -233,6 +251,7 @@ async def get_stats(session: AsyncSession, settlement_id: str | None = None) -> 
         Incident.status == "closed",
         Incident.created_at >= week_ago,
         Incident.closed_at.is_not(None),
+        visible_filter,
     )
     if settlement_id:
         closed_stmt = closed_stmt.join(Mahalla, Mahalla.id == Incident.mahalla_id).where(
