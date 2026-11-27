@@ -1,5 +1,5 @@
 from collections import Counter
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,13 +9,26 @@ from app.db.models import EventLog, Station, StationVote, utcnow
 
 VALID_STATION_STATUSES = {"open", "queue", "long_queue", "closed"}
 
+STATION_EVENT_LABELS = {
+    "open": "🟢 Bo‘sh (<15 daq)",
+    "queue": "🟡 O‘rtacha (~30 daq)",
+    "long_queue": "🟠 Uzun navbat (1 soat+)",
+    "closed": "🔴 Yopiq / yoqilg‘i yo‘q",
+}
+
+
+def _ensure_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
 
 async def submit_station_vote(
     session: AsyncSession,
     station_id: str,
     status: str,
     reporter_hash: str,
-    source: str = "web",
+    source: str = "bot",
 ) -> dict:
     if status not in VALID_STATION_STATUSES:
         raise ValueError("Noto‘g‘ri zapravka holati")
@@ -64,7 +77,7 @@ async def submit_station_vote(
             target_name=station.name_uz,
             event_type="station_update",
             source=source,
-            details=status,
+            details=STATION_EVENT_LABELS[status],
             created_at=now,
         )
     )
@@ -97,7 +110,6 @@ async def get_active_station_statuses(session: AsyncSession) -> dict[str, dict]:
 
     result: dict[str, dict] = {}
     for station_id, votes in by_station.items():
-        # Оставляем самый свежий голос каждого уникального пользователя
         latest_per_user: dict[str, StationVote] = {}
         for v in votes:
             if v.reporter_hash not in latest_per_user:
@@ -106,12 +118,11 @@ async def get_active_station_statuses(session: AsyncSession) -> dict[str, dict]:
         unique_votes = list(latest_per_user.values())
         counts = Counter(v.status for v in unique_votes)
 
-        # Сначала по количеству голосов, при равенстве — по свежести последнего голоса за этот статус
         best_status = max(
             counts.keys(),
             key=lambda st: (
                 counts[st],
-                max(v.created_at for v in unique_votes if v.status == st),
+                max(_ensure_utc(v.created_at) for v in unique_votes if v.status == st),
             ),
         )
         newest = unique_votes[0]
@@ -120,8 +131,8 @@ async def get_active_station_statuses(session: AsyncSession) -> dict[str, dict]:
             "status": best_status,
             "votes_count": len(unique_votes),
             "source": newest.source,
-            "created_at": newest.created_at.isoformat(),
-            "expires_at": newest.expires_at.isoformat(),
+            "created_at": _ensure_utc(newest.created_at).isoformat(),
+            "expires_at": _ensure_utc(newest.expires_at).isoformat(),
         }
 
     return result
