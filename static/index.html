@@ -7,7 +7,7 @@
   <title>Xonobod Bugun — Chiroq, Suv, Gaz va Zapravkalar xaritasi</title>
 
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <meta name="theme-color" content="#2ca7f2" />
+  <meta id="meta-theme-color" name="theme-color" content="#2ca7f2" />
   <meta name="description" content="Xonobod va Sultonoboddagi chiroq, suv, gaz uzilishlari hamda metan, propan va benzin zapravkalar holati jonli xaritada." />
 
   <!-- Превью карточки при пересылке ссылки в Telegram -->
@@ -19,31 +19,44 @@
   <!-- Telegram Mini App SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
+  <!-- Мгновенное применение темы до отрисовки (без белой вспышки) -->
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('xb_theme');
+        var tgDark = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.colorScheme === 'dark';
+        var sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = saved ? saved === 'dark' : (tgDark || sysDark);
+        if (isDark) document.documentElement.classList.add('dark');
+      } catch (e) {}
+    })();
+  </script>
+
   <!-- Локальные стили и карта (без внешних CDN — быстро на 3G) -->
   <link rel="stylesheet" href="/css/tailwind.css" />
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
   <script src="/vendor/leaflet/leaflet.js"></script>
   <link rel="stylesheet" href="/css/app.css" />
 </head>
-<body class="bg-slate-100 select-none">
+<body class="bg-slate-100 dark:bg-slate-900 select-none">
 
   <div id="map"></div>
 
   <!-- Погода в левом верхнем углу (ПК) -->
   <div id="weather-card-desktop"
-    class="hidden sm:flex fixed top-4 left-4 z-[1000] items-center gap-2.5 bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_6px_24px_rgba(15,23,42,0.1)] border border-slate-200/70 px-4 py-2.5">
+    class="hidden sm:flex fixed top-4 left-4 z-[1000] items-center gap-2.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl shadow-[0_6px_24px_rgba(15,23,42,0.1)] dark:shadow-[0_6px_24px_rgba(0,0,0,0.45)] border border-slate-200/70 dark:border-slate-700/80 px-4 py-2.5">
     <span id="weather-icon-desktop" class="text-2xl leading-none">⛅</span>
-    <span id="weather-temp-desktop" class="text-[22px] font-bold text-slate-800 leading-none tracking-tight">--°</span>
+    <span id="weather-temp-desktop" class="text-[22px] font-bold text-slate-800 dark:text-slate-100 leading-none tracking-tight">--°</span>
   </div>
 
   <!-- Главная панель: мобилка сверху на всю ширину, ПК строго в правом верхнем углу -->
   <div class="fixed top-3 left-3 right-3 sm:top-4 sm:left-auto sm:right-4 sm:w-[348px] z-[1000] pointer-events-none">
-    <div class="bg-white/95 backdrop-blur-md rounded-[20px] shadow-[0_8px_30px_rgba(15,23,42,0.12)] border border-slate-200/70 p-3.5 pointer-events-auto">
+    <div id="main-panel" class="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-[20px] shadow-[0_8px_30px_rgba(15,23,42,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.5)] border border-slate-200/70 dark:border-slate-700/80 p-3.5 pointer-events-auto">
 
       <!-- Строка 1: Бренд + Zapravkalar (+ мобильная погода) -->
       <div class="flex items-center justify-between gap-2 mb-2.5">
-        <div class="font-bold text-[17px] tracking-tight text-slate-900 whitespace-nowrap shrink-0 leading-none">
-          Xonobod <span class="text-sky-500">Bugun</span>
+        <div class="font-bold text-[17px] tracking-tight text-slate-900 dark:text-slate-100 whitespace-nowrap shrink-0 leading-none">
+          Xonobod <span class="text-sky-500 dark:text-sky-400">Bugun</span>
         </div>
 
         <div class="flex items-center gap-1.5 shrink-0">
@@ -58,7 +71,7 @@
             <span class="text-[10px] opacity-65">↗</span>
           </button>
 
-          <div id="weather-box-mobile" class="flex sm:hidden items-center gap-0.5 text-xs font-semibold text-slate-500 whitespace-nowrap">
+          <div id="weather-box-mobile" class="flex sm:hidden items-center gap-0.5 text-xs font-semibold text-slate-500 dark:text-slate-300 whitespace-nowrap">
             <span>⛅</span><span>--°</span>
           </div>
         </div>
@@ -81,26 +94,26 @@
       <div id="filter-row" class="flex items-center gap-1.5 mb-2.5 overflow-x-auto no-scrollbar"></div>
 
       <!-- Строка 5: Навигация -->
-      <div class="flex items-center justify-between text-[12.5px] text-slate-400 mb-2">
+      <div class="flex items-center justify-between text-[12.5px] text-slate-400 dark:text-slate-400 mb-2">
         <div class="flex items-center gap-3.5">
-          <button id="btn-stats" type="button" class="hover:text-slate-700 transition">Statistika</button>
-          <button id="btn-faq" type="button" class="hover:text-slate-700 transition">Savol-javob</button>
-          <button id="btn-timeline" type="button" class="hover:text-slate-700 transition">Taymlayn</button>
+          <button id="btn-stats" type="button" class="hover:text-slate-700 dark:hover:text-slate-200 transition">Statistika</button>
+          <button id="btn-faq" type="button" class="hover:text-slate-700 dark:hover:text-slate-200 transition">Savol-javob</button>
+          <button id="btn-timeline" type="button" class="hover:text-slate-700 dark:hover:text-slate-200 transition">Taymlayn</button>
         </div>
-        <button id="btn-edit-coords" type="button" class="hidden text-xs text-sky-600 hover:text-sky-700 font-semibold">
+        <button id="btn-edit-coords" type="button" class="hidden text-xs text-sky-600 dark:text-sky-400 hover:text-sky-700 font-semibold">
           📍 Tahrirlash
         </button>
       </div>
 
       <!-- Строка 6: Сводка и время -->
       <div class="leading-snug">
-        <div id="summary-text" class="text-[12.5px] text-slate-700">Yuklanmoqda...</div>
-        <div id="updated-text" class="text-[11.5px] text-slate-400 mt-0.5">Yangilanmoqda...</div>
+        <div id="summary-text" class="text-[12.5px] text-slate-700 dark:text-slate-200">Yuklanmoqda...</div>
+        <div id="updated-text" class="text-[11.5px] text-slate-400 dark:text-slate-500 mt-0.5">Yangilanmoqda...</div>
       </div>
     </div>
 
     <!-- Редактор координат (только при /?edit=1) -->
-    <div id="edit-bar" class="hidden mt-2 bg-slate-900/95 backdrop-blur text-white rounded-2xl shadow-xl p-3 pointer-events-auto">
+    <div id="edit-bar" class="hidden mt-2 bg-slate-900/95 backdrop-blur text-white rounded-2xl shadow-xl p-3 pointer-events-auto border border-slate-700">
       <div class="flex items-center justify-between mb-2">
         <span class="text-xs font-bold text-amber-300">📍 Koordinatalarni sozlash</span>
         <button id="btn-edit-close" type="button" class="text-xs text-slate-300 hover:text-white">✕ Yopish</button>
@@ -117,15 +130,21 @@
     </div>
   </div>
 
+  <!-- Переключатель тёмной темы справа над кнопкой спутника -->
+  <button id="btn-theme" type="button" title="Tungi / Kunduzgi rejim"
+    class="fixed bottom-[138px] right-[16px] z-[900] w-[34px] h-[34px] rounded-[10px] bg-white/95 dark:bg-slate-900/95 backdrop-blur shadow-[0_4px_16px_rgba(15,23,42,0.12)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.45)] border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-center text-base hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-95 transition">
+    🌙
+  </button>
+
   <!-- Переключатель спутника справа над зумом -->
   <button id="btn-layer" type="button" title="Xarita / Yo‘ldosh"
-    class="fixed bottom-[96px] right-[16px] z-[900] w-[34px] h-[34px] rounded-[10px] bg-white/95 backdrop-blur shadow-[0_4px_16px_rgba(15,23,42,0.12)] border border-slate-200/80 flex items-center justify-center text-base hover:bg-slate-50 active:scale-95 transition">
+    class="fixed bottom-[96px] right-[16px] z-[900] w-[34px] h-[34px] rounded-[10px] bg-white/95 dark:bg-slate-900/95 backdrop-blur shadow-[0_4px_16px_rgba(15,23,42,0.12)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.45)] border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-center text-base hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-95 transition">
     🛰️
   </button>
 
   <!-- Легенда слева внизу -->
   <div id="legend-box"
-    class="fixed bottom-[86px] sm:bottom-4 left-3 sm:left-4 z-[900] bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_6px_24px_rgba(15,23,42,0.1)] border border-slate-200/70 px-3.5 py-2.5 text-[12px] text-slate-700 space-y-1.5"></div>
+    class="fixed bottom-[86px] sm:bottom-4 left-3 sm:left-4 z-[900] bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl shadow-[0_6px_24px_rgba(15,23,42,0.1)] dark:shadow-[0_6px_24px_rgba(0,0,0,0.45)] border border-slate-200/70 dark:border-slate-700/80 px-3.5 py-2.5 text-[12px] text-slate-700 dark:text-slate-200 space-y-1.5"></div>
 
   <!-- Центральная кнопка снизу + Telegram-ссылка -->
   <div class="fixed bottom-3 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-auto z-[950] flex flex-col items-center gap-1 pointer-events-none">
@@ -134,24 +153,24 @@
       ⚡ Uzilish haqida xabar berish
     </button>
     <button id="btn-contact" type="button"
-      class="pointer-events-auto text-[11.5px] font-medium text-slate-600 hover:text-sky-600 text-halo transition py-0.5">
+      class="pointer-events-auto text-[11.5px] font-medium text-slate-600 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 text-halo transition py-0.5">
       Biz bilan bog‘lanish · Telegram-bot
     </button>
   </div>
 
   <!-- Универсальное модальное окно -->
-  <div id="modal-backdrop" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[1100] flex items-end sm:items-center justify-center p-3">
-    <div id="modal-card" class="w-full max-w-md bg-white rounded-3xl shadow-2xl max-h-[84vh] flex flex-col overflow-hidden">
-      <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
-        <h3 id="modal-title" class="font-bold text-slate-900 text-base"></h3>
-        <button id="modal-close" type="button" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition">✕</button>
+  <div id="modal-backdrop" class="hidden fixed inset-0 bg-slate-900/40 dark:bg-black/65 backdrop-blur-[2px] z-[1100] flex items-end sm:items-center justify-center p-3">
+    <div id="modal-card" class="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-transparent dark:border-slate-800 max-h-[84vh] flex flex-col overflow-hidden">
+      <div id="modal-header" class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-slate-800">
+        <h3 id="modal-title" class="font-bold text-slate-900 dark:text-slate-100 text-base"></h3>
+        <button id="modal-close" type="button" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-300 transition">✕</button>
       </div>
-      <div id="modal-body" class="p-5 overflow-y-auto text-sm text-slate-700"></div>
+      <div id="modal-body" class="p-5 overflow-y-auto text-sm text-slate-700 dark:text-slate-200"></div>
     </div>
   </div>
 
   <!-- Тост-уведомление -->
-  <div id="toast" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-[1200] bg-slate-900/95 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-xl max-w-[90vw] text-center"></div>
+  <div id="toast" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-[1200] bg-slate-900/95 dark:bg-slate-800 dark:border dark:border-slate-700 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-xl max-w-[90vw] text-center"></div>
 
   <script type="module" src="/js/app.js"></script>
 </body>

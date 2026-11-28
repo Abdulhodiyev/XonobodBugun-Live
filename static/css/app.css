@@ -116,3 +116,201 @@ html, body, #map {
 .hourly-bar.has-val {
   background: #2ca7f2;
 }
+
+/* ==================== ТЁМНАЯ ТЕМА (Tungi rejim) ==================== */
+
+html.dark,
+html.dark body,
+html.dark #map {
+  background-color: #0f172a;
+}
+
+/* Затемняем тайлы OSM ночью (но не трогаем спутниковые снимки) */
+html.dark:not(.map-satellite) .leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(180deg) brightness(92%) contrast(90%) saturate(85%);
+}
+
+html.dark .leaflet-control-zoom {
+  border-color: rgba(148, 163, 184, 0.22) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.dark .leaflet-control-zoom a {
+  color: #e2e8f0 !important;
+  background: rgba(15, 23, 42, 0.95) !important;
+  border-color: rgba(51, 65, 85, 0.8) !important;
+}
+
+html.dark .leaflet-control-zoom a:hover {
+  background: #1e293b !important;
+}
+
+html.dark .leaflet-control-attribution {
+  background: rgba(15, 23, 42, 0.78) !important;
+  color: #94a3b8 !important;
+}
+
+html.dark .leaflet-control-attribution a {
+  color: #7dd3fc !important;
+}
+
+html.dark .mahalla-label {
+  background: rgba(15, 23, 42, 0.9);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #e2e8f0;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
+}
+
+html.dark .mahalla-label-alert {
+  background: #450a0a;
+  border-color: rgba(248, 113, 113, 0.65);
+  color: #fecaca;
+}
+
+html.dark .mahalla-label-warn {
+  background: #451a03;
+  border-color: rgba(251, 191, 36, 0.65);
+  color: #fde68a;
+}
+
+html.dark .mahalla-label-plan {
+  background: #2e1065;
+  border-color: rgba(167, 139, 250, 0.65);
+  color: #ddd6fe;
+}
+
+html.dark .marker-wrap:hover .mahalla-label {
+  background: #1e293b;
+}
+
+html.dark .text-halo {
+  text-shadow: 0 0 6px #0f172a, 0 0 6px #0f172a, 0 1px 2px rgba(0, 0, 0, 0.95);
+}
+
+/* Тёмные модальные окна (автоматически адаптирует modals.js) */
+html.dark #modal-body select {
+  background-color: #1e293b;
+  color: #f1f5f9;
+  border-color: #334155;
+}
+
+html.dark #modal-body .bg-white,
+html.dark #modal-body .bg-slate-50 {
+  background-color: #1e293b;
+}
+
+html.dark #modal-body .bg-slate-100 {
+  background-color: #334155;
+}
+
+html.dark #modal-body .border-slate-100,
+html.dark #modal-body .border-slate-200,
+html.dark #modal-body .border-slate-300 {
+  border-color: #334155;
+}
+
+html.dark #modal-body .text-slate-900,
+html.dark #modal-body .text-slate-800 {
+  color: #f1f5f9;
+}
+
+html.dark #modal-body .text-slate-700,
+html.dark #modal-body .text-slate-600 {
+  color: #cbd5e1;
+}
+
+html.dark #modal-body .text-slate-500,
+html.dark #modal-body .text-slate-400 {
+  color: #94a3b8;
+}
+
+html.dark #modal-body .bg-rose-50 {
+  background-color: rgba(136, 19, 55, 0.35);
+  border-color: rgba(244, 63, 94, 0.45);
+  color: #fecdd3;
+}
+
+html.dark #modal-body .bg-rose-200\/80 {
+  background-color: rgba(225, 29, 72, 0.35);
+  color: #fecdd3;
+}
+
+html.dark #modal-body .bg-amber-50 {
+  background-color: rgba(120, 53, 15, 0.35);
+  border-color: rgba(245, 158, 11, 0.45);
+  color: #fde68a;
+}
+
+html.dark #modal-body .bg-amber-200\/80,
+html.dark #modal-body .bg-amber-200\/70 {
+  background-color: rgba(217, 119, 6, 0.35);
+  color: #fde68a;
+}
+
+html.dark #modal-body .bg-emerald-50 {
+  background-color: rgba(6, 78, 59, 0.35);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #a7f3d0;
+}
+
+html.dark #modal-body .bg-violet-50 {
+  background-color: rgba(76, 29, 149, 0.38);
+  border-color: rgba(139, 92, 246, 0.45);
+  color: #ddd6fe;
+}
+
+html.dark #modal-body .bg-sky-50,
+html.dark #modal-body .bg-sky-100 {
+  background-color: rgba(12, 74, 110, 0.42);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #bae6fd;
+}
+
+html.dark #modal-body .bg-blue-50 {
+  background-color: rgba(30, 58, 138, 0.4);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #bfdbfe;
+}
+
+html.dark #modal-body .bg-orange-50 {
+  background-color: rgba(124, 45, 18, 0.4);
+  border-color: rgba(249, 115, 22, 0.35);
+  color: #fed7aa;
+}
+
+html.dark #modal-body .text-sky-700,
+html.dark #modal-body .text-sky-800 {
+  color: #7dd3fc;
+}
+
+html.dark #modal-body .text-blue-700 {
+  color: #93c5fd;
+}
+
+html.dark #modal-body .text-orange-700 {
+  color: #fdba74;
+}
+
+html.dark #modal-body .text-rose-600 {
+  color: #fb7185;
+}
+
+html.dark #modal-body .bg-\[\#eff8ff\] {
+  background-color: rgba(14, 165, 233, 0.22);
+  border-color: #38bdf8;
+  color: #7dd3fc;
+}
+
+html.dark #modal-body .hover\:bg-slate-100:hover,
+html.dark #modal-body .hover\:bg-sky-50:hover,
+html.dark #modal-body .hover\:bg-sky-100:hover {
+  background-color: #334155;
+}
+
+html.dark .hourly-bar {
+  background: #334155;
+}
+
+html.dark .hourly-bar.has-val {
+  background: #38bdf8;
+}

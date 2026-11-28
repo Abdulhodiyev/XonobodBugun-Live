@@ -20,6 +20,72 @@ import {
 } from './modals.js';
 import { STATE, escapeHtml, formatLocalTime, showToast } from './state.js';
 
+const THEME_STORAGE_KEY = 'xb_theme';
+
+function applyTheme(isDark, persist = false) {
+  document.documentElement.classList.toggle('dark', isDark);
+
+  const btn = document.getElementById('btn-theme');
+  if (btn) {
+    btn.textContent = isDark ? '☀️' : '🌙';
+    btn.title = isDark ? 'Kunduzgi rejim' : 'Tungi rejim';
+  }
+
+  const meta = document.getElementById('meta-theme-color');
+  if (meta) {
+    meta.setAttribute('content', isDark ? '#0f172a' : '#2ca7f2');
+  }
+
+  const tgWebApp = window.Telegram?.WebApp;
+  if (tgWebApp && tgWebApp.initData) {
+    try {
+      tgWebApp.setHeaderColor?.(isDark ? '#0f172a' : '#ffffff');
+      tgWebApp.setBackgroundColor?.(isDark ? '#0f172a' : '#f1f5f9');
+    } catch {
+      // Старые клиенты Telegram могут не поддерживать произвольный hex
+    }
+  }
+
+  if (persist) {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, isDark ? 'dark' : 'light');
+    } catch {
+      // Игнорируем ограничения приватного режима
+    }
+  }
+}
+
+function initTheme() {
+  let saved = null;
+  try {
+    saved = localStorage.getItem(THEME_STORAGE_KEY);
+  } catch {
+    saved = null;
+  }
+
+  const tgWebApp = window.Telegram?.WebApp;
+  const tgDark = tgWebApp?.colorScheme === 'dark';
+  const sysDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+  const isDark = saved ? saved === 'dark' : Boolean(tgDark || sysDark);
+
+  applyTheme(isDark, false);
+
+  // Если пользователь не фиксировал тему вручную, подхватываем переключение темы в Telegram
+  tgWebApp?.onEvent?.('themeChanged', () => {
+    try {
+      if (localStorage.getItem(THEME_STORAGE_KEY)) return;
+    } catch {
+      return;
+    }
+    applyTheme(tgWebApp.colorScheme === 'dark', false);
+  });
+}
+
+function toggleTheme() {
+  const nextDark = !document.documentElement.classList.contains('dark');
+  applyTheme(nextDark, true);
+}
+
 function renderUI() {
   // 1. Погода
   if (STATE.weather && STATE.weather.temp !== null) {
@@ -42,8 +108,8 @@ function renderUI() {
         <button data-settlement="${escapeHtml(s.id)}" type="button"
           class="px-2.5 py-1 rounded-full text-[11.5px] border whitespace-nowrap transition ${
             STATE.settlement === s.id
-              ? 'border-slate-800 bg-slate-800 text-white font-semibold'
-              : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 font-medium'
+              ? 'border-slate-800 bg-slate-800 text-white dark:border-sky-400 dark:bg-sky-500 dark:text-white font-semibold'
+              : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-700 font-medium'
           }">${escapeHtml(s.name_uz)}</button>
       `)
       .join('');
@@ -56,20 +122,22 @@ function renderUI() {
   const stBtn = document.getElementById('btn-stations-tab');
   stBtn.className = STATE.mode === 'stations'
     ? 'flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[12px] font-semibold whitespace-nowrap transition border-[#2ca7f2] bg-[#2ca7f2] text-white shadow-sm'
-    : 'flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[12px] font-medium whitespace-nowrap transition border-sky-300/90 bg-sky-50/50 text-sky-700 hover:bg-sky-50';
+    : 'flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[12px] font-medium whitespace-nowrap transition border-sky-300/90 bg-sky-50/50 text-sky-700 hover:bg-sky-50 dark:border-sky-500/40 dark:bg-sky-950/50 dark:text-sky-300 dark:hover:bg-sky-900/50';
 
   // 4. Вкладки Chiroq / Suv / Gaz
   const activeTabClass = {
-    power: 'border-[#38a3eb] bg-[#eff8ff] text-[#0b6fb5] font-semibold',
-    water: 'border-[#3b82f6] bg-[#eff6ff] text-[#1d4ed8] font-semibold',
-    gas:   'border-[#f97316] bg-[#fff7ed] text-[#c2410c] font-semibold',
+    power: 'border-[#38a3eb] bg-[#eff8ff] text-[#0b6fb5] dark:border-sky-400 dark:bg-sky-950/70 dark:text-sky-300 font-semibold',
+    water: 'border-[#3b82f6] bg-[#eff6ff] text-[#1d4ed8] dark:border-blue-400 dark:bg-blue-950/70 dark:text-blue-300 font-semibold',
+    gas:   'border-[#f97316] bg-[#fff7ed] text-[#c2410c] dark:border-orange-400 dark:bg-orange-950/70 dark:text-orange-300 font-semibold',
   };
   for (const u of ['power', 'water', 'gas']) {
     const btn = document.getElementById(`tab-${u}`);
     const active = STATE.mode === 'utilities' && STATE.utility === u;
     btn.className =
       'py-1.5 px-2 rounded-xl text-[12.5px] border transition flex items-center justify-center gap-1 whitespace-nowrap ' +
-      (active ? activeTabClass[u] : 'border-slate-200/90 bg-white text-slate-600 hover:bg-slate-50 font-medium');
+      (active
+        ? activeTabClass[u]
+        : 'border-slate-200/90 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-700 font-medium');
   }
 
   // 5. Строка фильтров
@@ -79,28 +147,30 @@ function renderUI() {
       <button data-filter="showCrowd" type="button"
         class="px-3 py-1 rounded-xl text-[12px] border transition flex items-center gap-1.5 whitespace-nowrap ${
           STATE.showCrowd
-            ? 'border-[#38a3eb] bg-[#eff8ff] text-[#0b6fb5] font-semibold'
-            : 'border-slate-200 bg-white text-slate-400 font-medium'
+            ? 'border-[#38a3eb] bg-[#eff8ff] text-[#0b6fb5] dark:border-sky-400 dark:bg-sky-950/70 dark:text-sky-300 font-semibold'
+            : 'border-slate-200 bg-white text-slate-400 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-400 font-medium'
         }">🤖 Botdan</button>
       <button data-filter="showPlanned" type="button"
         class="px-3 py-1 rounded-xl text-[12px] border transition flex items-center gap-1.5 whitespace-nowrap ${
           STATE.showPlanned
-            ? 'border-[#8b5cf6] bg-[#f5f3ff] text-[#6d28d9] font-semibold'
-            : 'border-slate-200 bg-white text-slate-400 font-medium'
+            ? 'border-[#8b5cf6] bg-[#f5f3ff] text-[#6d28d9] dark:border-violet-400 dark:bg-violet-950/70 dark:text-violet-300 font-semibold'
+            : 'border-slate-200 bg-white text-slate-400 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-400 font-medium'
         }">🟣 Rejali ishlar</button>
     `;
   } else {
     const opts = [
-      ['all',    'Barchasi',  'border-[#38a3eb] bg-[#eff8ff] text-[#0b6fb5] font-semibold'],
-      ['metan',  '🔵 Metan',  'border-blue-400 bg-blue-50 text-blue-700 font-semibold'],
-      ['propan', '🟡 Propan', 'border-amber-400 bg-amber-50 text-amber-700 font-semibold'],
-      ['benzin', '⛽ Benzin', 'border-emerald-400 bg-emerald-50 text-emerald-700 font-semibold'],
+      ['all',    'Barchasi',  'border-[#38a3eb] bg-[#eff8ff] text-[#0b6fb5] dark:border-sky-400 dark:bg-sky-950/70 dark:text-sky-300 font-semibold'],
+      ['metan',  '🔵 Metan',  'border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-950/70 dark:text-blue-300 font-semibold'],
+      ['propan', '🟡 Propan', 'border-amber-400 bg-amber-50 text-amber-700 dark:border-amber-400 dark:bg-amber-950/70 dark:text-amber-300 font-semibold'],
+      ['benzin', '⛽ Benzin', 'border-emerald-400 bg-emerald-50 text-emerald-700 dark:border-emerald-400 dark:bg-emerald-950/70 dark:text-emerald-300 font-semibold'],
     ];
     filterRow.innerHTML = opts
       .map(([k, lbl, activeCls]) => `
         <button data-fuel="${k}" type="button"
           class="px-2.5 py-1 rounded-xl text-[12px] border transition whitespace-nowrap ${
-            STATE.fuelFilter === k ? activeCls : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 font-medium'
+            STATE.fuelFilter === k
+              ? activeCls
+              : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-700 font-medium'
           }">${lbl}</button>
       `)
       .join('');
@@ -117,7 +187,7 @@ function renderUI() {
       <div class="flex items-center gap-2.5"><span class="w-3 h-3 rounded-full bg-yellow-500 shrink-0"></span> O‘rtacha (~30 daq)</div>
       <div class="flex items-center gap-2.5"><span class="w-3 h-3 rounded-full bg-orange-500 shrink-0"></span> Uzun navbat (1 soat+)</div>
       <div class="flex items-center gap-2.5"><span class="w-3 h-3 rounded-full bg-rose-500 shrink-0"></span> Yopiq / yoqilg‘i yo‘q</div>
-      <div class="flex items-center gap-2.5"><span class="w-3 h-3 rounded-full bg-slate-300 shrink-0"></span> Ma’lumot yo‘q</div>
+      <div class="flex items-center gap-2.5"><span class="w-3 h-3 rounded-full bg-slate-300 dark:bg-slate-500 shrink-0"></span> Ma’lumot yo‘q</div>
     `;
   } else {
     const ctaMap = {
@@ -189,6 +259,8 @@ function toggleEditMode() {
 }
 
 function bindEvents() {
+  document.getElementById('btn-theme').addEventListener('click', toggleTheme);
+
   document.getElementById('btn-stations-tab').addEventListener('click', () => {
     STATE.mode = STATE.mode === 'stations' ? 'utilities' : 'stations';
     renderUI();
@@ -275,6 +347,8 @@ async function initApp() {
     tgWebApp.expand();
     document.getElementById('btn-contact')?.classList.add('hidden');
   }
+
+  initTheme();
 
   initMap(latlng => {
     if (!STATE.config) return;
