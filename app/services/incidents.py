@@ -1,5 +1,5 @@
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +28,10 @@ def _actor_key(source: str, reporter_hash: str, ip_hash: str) -> str:
 def _clean_hint(street_hint: str) -> str:
     return " ".join((street_hint or "").strip().split())[:160]
 
+def _ensure_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 async def cleanup_expired(session: AsyncSession) -> int:
     now = utcnow()
@@ -102,7 +106,10 @@ async def submit_outage_report(
             "ok": False,
             "became_confirmed": False,
             "mahalla_name": mahalla.name_uz,
-            "message": f"Siz yaqinda xabar yuborgansiz. {settings.rate_limit_minutes} daqiqadan so‘ng qayta urinishingiz mumkin.",
+            "message": (
+                "Siz bu uzilish haqida allaqachon xabar bergansiz (1 kishi = 1 ovoz). "
+                f"Muammo davom etsa, {settings.rate_limit_minutes} daqiqadan so‘ng holatni yana yangilashingiz mumkin."
+            ),
         }
 
     # 2. Ищем активный народный инцидент (включая скрытый pending в окне кворума)
@@ -188,7 +195,38 @@ async def submit_outage_report(
             "message": msg,
         }
 
-    # 3. Инцидент уже существует — добавляем голос и пересчитываем уникальных пользователей
+    # 3. Инцидент уже существует — проверяем, голосовал ли этот актор ранее
+    existing_rows = (
+        await session.execute(
+            select(Report.source, Report.reporter_hash, Report.ip_hash).where(
+                Report.incident_id == incident.id,
+                Report.action == "report",
+            )
+        )
+    ).all()
+    existing_actors = {_actor_key(src, rh, ih) for src, rh, ih in existing_rows}
+    current_actor = _actor_key(source, reporter_hash, ip_hash)
+    already_voted = current_actor in existing_actors
+
+    # Повтор от того же человека по скрытой заявке pending: не продлеваем окно и не накручиваем счётчик
+    if already_voted and incident.status == "pending":
+        if hint and hint != incident.street_hint:
+            incident.street_hint = hint
+            await session.commit()
+        unique_count = len(existing_actors)
+        return {
+            "ok": True,
+            "incident_id": incident.id,
+            "status": "pending",
+            "reports_count": unique_count,
+            "became_confirmed": False,
+            "mahalla_name": mahalla.name_uz,
+            "message": (
+                f"Sizning xabaringiz allaqachon ro‘yxatda ({unique_count}/{settings.orange_threshold}, 1 kishi = 1 ovoz). "
+                "Xaritada ko‘rinishi uchun shu mahalladan boshqa aholi ham tasdiqlashi kerak."
+            ),
+        }
+
     session.add(
         Report(
             incident_id=incident.id,
@@ -202,15 +240,7 @@ async def submit_outage_report(
     )
     await session.flush()
 
-    rep_rows = (
-        await session.execute(
-            select(Report.source, Report.reporter_hash, Report.ip_hash).where(
-                Report.incident_id == incident.id,
-                Report.action == "report",
-            )
-        )
-    ).all()
-    unique_actors = {_actor_key(src, rh, ih) for src, rh, ih in rep_rows}
+    unique_actors = existing_actors | {current_actor}
     unique_count = len(unique_actors)
 
     old_status = incident.status
@@ -265,7 +295,12 @@ async def submit_outage_report(
     await session.commit()
     app_cache.invalidate("state", "stats")
 
-    if became_confirmed:
+    if already_voted:
+        msg = (
+            "🔄 Holat yangilandi! Sizning ovozingiz allaqachon hisobda (1 kishi = 1 ovoz), "
+            "muammo hali davom etayotgani qayd etildi."
+        )
+    elif became_confirmed:
         msg = (
             f"🔴 Avariya tasdiqlangan ({unique_count} ta xabar)! "
             "Obunachilarga ogohlantirish yuborildi."
@@ -523,4 +558,54 @@ async def create_planned_outage(
             if updated
             else f"Rejali o‘chirish qo‘shildi: {mahalla.name_uz} MFY"
         ),
+    }
+
+
+async def update_incident_hint(
+    session: AsyncSession,
+    incident_id: int,
+    reporter_hash: str,
+    street_hint: str,
+    force_admin: bool = False,
+) -> dict:
+    hint = _clean_hint(street_hint)
+    if not hint:
+        return {"ok": False, "message": "Mo‘ljal matni bo‘sh bo‘lmasligi kerak."}
+
+    now = utcnow()
+    incident = await session.get(Incident, incident_id)
+    if (
+        not incident
+        or incident.status not in {"pending", "unconfirmed", "confirmed"}
+        or _ensure_utc(incident.expires_at) <= now
+    ):
+        return {"ok": False, "message": "Bu uzilish allaqachon yopilgan."}
+
+    if not force_admin:
+        own_report = (
+            await session.execute(
+                select(Report)
+                .where(
+                    Report.incident_id == incident_id,
+                    Report.reporter_hash == reporter_hash,
+                    Report.action == "report",
+                )
+                .order_by(Report.id.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if own_report is None:
+            return {"ok": False, "message": "Faqat xabar yuborgan foydalanuvchi mo‘ljal qo‘sha oladi."}
+        own_report.street_hint = hint
+
+    incident.street_hint = hint
+    await session.commit()
+    app_cache.invalidate("state")
+
+    mahalla = await session.get(Mahalla, incident.mahalla_id)
+    return {
+        "ok": True,
+        "hint": hint,
+        "mahalla_name": mahalla.name_uz if mahalla else incident.mahalla_id,
+        "message": "Mo‘ljal saqlandi!",
     }

@@ -1,7 +1,8 @@
 import asyncio
 import io
 from datetime import datetime, timezone
-
+import html
+from app.services.incidents import submit_outage_report, submit_resolve, update_incident_hint
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandObject, CommandStart
@@ -79,6 +80,7 @@ GPS_PROMPT_STATION = (
 class ReportFlow(StatesGroup):
     waiting_location = State()
     waiting_station_photo = State()
+    waiting_street_hint = State()
 
 
 async def safe_edit_text(call: CallbackQuery, text: str, reply_markup: InlineKeyboardMarkup) -> None:
@@ -127,6 +129,13 @@ async def _send_report_result(
         )
 
     rows = []
+    if res.get("ok") and res.get("incident_id"):
+        rows.append([
+            InlineKeyboardButton(
+                text="📍 Mo‘ljal / dom qo‘shish (ixtiyoriy)",
+                callback_data=f"hint:{res['incident_id']}",
+            )
+        ])
     if mahalla_id not in subscribed:
         rows.append([
             InlineKeyboardButton(
@@ -490,6 +499,65 @@ async def cb_sub_quick(call: CallbackQuery):
     )
     await call.answer("🔔 Obuna yoqildi")
 
+
+@router.callback_query(F.data.startswith("hint:"))
+async def cb_street_hint_start(call: CallbackQuery, state: FSMContext):
+    try:
+        incident_id = int(call.data.split(":", 1)[1])
+    except ValueError:
+        await call.answer("Xatolik", show_alert=True)
+        return
+
+    await state.set_state(ReportFlow.waiting_street_hint)
+    await state.update_data(incident_id=incident_id)
+    await call.message.answer(
+        "📍 <b>Aniq mo‘ljal yoki dom raqamini yozing</b>\n\n"
+        "Masalan: <code>45-dom, 2-pod’ezd</code> yoki <code>Maktab yonidagi ko‘cha</code>.\n"
+        "Bu xaritada va dispetcherga murojaatda ko‘rinadi.",
+        reply_markup=cancel_reply_kb(),
+    )
+    await call.answer()
+
+
+@router.message(ReportFlow.waiting_street_hint, F.text, F.text != "❌ Bekor qilish")
+async def msg_street_hint_save(message: Message, state: FSMContext):
+    data = await state.get_data()
+    incident_id = data.get("incident_id")
+    await state.clear()
+
+    user_id = message.from_user.id
+    is_admin = user_id in settings.admin_ids
+    reporter_hash = hash_reporter(f"tg:{user_id}")
+
+    async with AsyncSessionLocal() as session:
+        res = await update_incident_hint(
+            session=session,
+            incident_id=incident_id,
+            reporter_hash=reporter_hash,
+            street_hint=message.text,
+            force_admin=is_admin,
+        )
+
+    if res["ok"]:
+        safe_hint = html.escape(res["hint"])
+        await message.answer(
+            f"✅ <b>{res['mahalla_name']} MFY</b> uchun mo‘ljal qo‘shildi:\n"
+            f"📍 <b>{safe_hint}</b>",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+    else:
+        await message.answer(f"⚠️ {res['message']}", reply_markup=ReplyKeyboardRemove())
+
+    await message.answer("Asosiy menyu:", reply_markup=main_menu_kb(is_admin=is_admin))
+
+
+@router.message(ReportFlow.waiting_street_hint)
+async def msg_wrong_street_hint(message: Message):
+    await message.answer(
+        "✍️ Iltimos, mo‘ljalni oddiy matn ko‘rinishida yozing (masalan: <code>45-dom</code>) "
+        "yoki <b>«❌ Bekor qilish»</b> tugmasini bosing.",
+        reply_markup=cancel_reply_kb(),
+    )
 
 # --- 2. Заправки (GPS + опциональное фото очереди на 1 час) ---
 

@@ -9,7 +9,7 @@ from app.services.incidents import (
     cleanup_expired,
     create_planned_outage,
     submit_outage_report,
-    submit_resolve,
+    submit_resolve, update_incident_hint,
 )
 from app.services.stations import get_active_station_statuses, submit_station_vote
 from app.services.stats import get_active_state, get_geo_config, get_stats, get_timeline
@@ -243,3 +243,24 @@ async def test_station_long_queue_status(db_session):
 
     statuses = await get_active_station_statuses(db_session)
     assert statuses["st_metan_1"]["status"] == "long_queue"
+
+
+async def test_update_incident_hint_permissions(db_session):
+    u1 = hash_reporter("tg:801")
+    u2 = hash_reporter("tg:802")
+    stranger = hash_reporter("tg:899")
+
+    r1 = await submit_outage_report(db_session, "xon_fozilmon", "power", u1, source="bot")
+    await submit_outage_report(db_session, "xon_fozilmon", "power", u2, source="bot")
+
+    # Посторонний не может менять ориентир
+    bad = await update_incident_hint(db_session, r1["incident_id"], stranger, "Fake dom")
+    assert bad["ok"] is False
+
+    # Автор жалобы добавляет ориентир -> появляется в /api/state
+    ok = await update_incident_hint(db_session, r1["incident_id"], u1, "  45-dom,   2-pod'ezd  ")
+    assert ok["ok"] is True
+    assert ok["hint"] == "45-dom, 2-pod'ezd"
+
+    state = await get_active_state(db_session, include_weather=False)
+    assert state["incidents"][0]["street_hint"] == "45-dom, 2-pod'ezd"
