@@ -24,6 +24,7 @@ def main_menu_kb(is_admin: bool = False) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="📊 Hozirgi holat", callback_data="menu:summary"),
         ],
         [InlineKeyboardButton(text="🔔 Mening mahallam (xabarnoma)", callback_data="menu:subs")],
+        [InlineKeyboardButton(text="📞 Ishonch telefonlari", callback_data="menu:contacts")],
     ])
     if is_admin:
         rows.append([InlineKeyboardButton(text="🛠 Admin panel", callback_data="adm:menu")])

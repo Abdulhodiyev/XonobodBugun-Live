@@ -19,16 +19,6 @@ export const STATION_STATUS_LABELS = {
   closed:     '🔴 Yopiq / yoqilg‘i yo‘q',
 };
 
-export function formatTimeAgo(isoStr) {
-  if (!isoStr) return '';
-  const diffMin = Math.max(0, Math.floor((Date.now() - new Date(isoStr).getTime()) / 60000));
-  if (diffMin < 1) return 'Hozirgina';
-  if (diffMin < 60) return `${diffMin} daqiqa oldin`;
-  const hours = Math.floor(diffMin / 60);
-  const mins = diffMin % 60;
-  return mins > 0 ? `${hours} soat ${mins} daqiqa oldin` : `${hours} soat oldin`;
-}
-
 export const STATE = {
   config: null,
   incidents: [],
@@ -62,6 +52,26 @@ export function formatLocalTime(isoStr) {
   });
 }
 
+export function formatTimeAgo(isoStr) {
+  if (!isoStr) return '';
+  const diffMin = Math.max(0, Math.floor((Date.now() - new Date(isoStr).getTime()) / 60000));
+  if (diffMin < 1) return 'Hozirgina';
+  if (diffMin < 60) return `${diffMin} daqiqa oldin`;
+  const hours = Math.floor(diffMin / 60);
+  const mins = diffMin % 60;
+  return mins > 0 ? `${hours} soat ${mins} daqiqa oldin` : `${hours} soat oldin`;
+}
+
+export function formatDurationSince(isoStr) {
+  if (!isoStr) return '';
+  const diffMin = Math.max(0, Math.floor((Date.now() - new Date(isoStr).getTime()) / 60000));
+  if (diffMin < 1) return 'hozirgina';
+  if (diffMin < 60) return `${diffMin} daq dan beri`;
+  const hours = Math.floor(diffMin / 60);
+  const mins = diffMin % 60;
+  return mins > 0 ? `${hours} soat ${mins} daq dan beri` : `${hours} soatdan beri`;
+}
+
 let toastTimer = null;
 export function showToast(text) {
   const el = document.getElementById('toast');
@@ -88,4 +98,45 @@ export function openBotDeepLink(payload = '') {
     return;
   }
   window.open(url, '_blank', 'noopener');
+}
+
+export async function copyText(text, successMsg = 'Nusxalandi!') {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    showToast(successMsg);
+  } catch {
+    showToast('Nusxalab bo‘lmadi');
+  }
+}
+
+export async function shareOrCopy(text, url = 'https://xonobodbugun.uz') {
+  const tgWebApp = window.Telegram?.WebApp;
+  if (tgWebApp && tgWebApp.initData && typeof tgWebApp.openTelegramLink === 'function') {
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+    tgWebApp.openTelegramLink(shareUrl);
+    return;
+  }
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ text, url });
+      return;
+    } catch {
+      // Пользователь отменил шаринг — ничего не делаем
+      return;
+    }
+  }
+
+  await copyText(`${text}\n${url}`, 'Matn nusxalandi! Mahalla guruhiga yuborishingiz mumkin');
 }

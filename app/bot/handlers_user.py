@@ -135,6 +135,7 @@ async def _send_report_result(
             )
         ])
     rows.append([InlineKeyboardButton(text="✅ Hal bo‘ldi (yondi/keldi)", callback_data=f"res:{util}:{mahalla_id}")])
+    rows.append([InlineKeyboardButton(text="📞 Ishonch telefonlari (1055 / Boshqaruv)", callback_data="menu:contacts")])
     rows.append([InlineKeyboardButton(text="⬅️ Asosiy menyu", callback_data="menu:home")])
 
     text = f"📍 <b>{res['mahalla_name']} MFY</b> · {UTILITY_LABELS_UZ[util]}\n\n{res['message']}"
@@ -840,6 +841,25 @@ async def cb_summary(call: CallbackQuery):
     )
     await safe_edit_text(call, "\n".join(lines), kb)
     await call.answer("Yangilandi")
+
+
+@router.callback_query(F.data == "menu:contacts")
+async def cb_contacts(call: CallbackQuery):
+    text = (
+        "📞 <b>Ishonch telefonlari (Xonobod)</b>\n\n"
+        "🏢 <b>Boshqaruv tashkiloti (ko‘p qavatli uylar):</b>\n"
+        "Elektr, suv, issiqlik, yerto‘la, tom va podyezd muammolari bo‘yicha:\n"
+        "• +998331001184\n"
+        "• +998937820367\n\n"
+        "🚨 <b>Kommunal dispetcherlik (24/7):</b>\n"
+        "• 1055\n\n"
+        "<i>Raqam ustiga bosib to‘g‘ridan-to‘g‘ri qo‘ng‘iroq qilishingiz mumkin.</i>"
+    )
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="⬅️ Asosiy menyu", callback_data="menu:home")]]
+    )
+    await safe_edit_text(call, text, kb)
+    await call.answer()
 
 
 @router.message(ReportFlow.waiting_location)

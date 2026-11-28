@@ -5,12 +5,21 @@ import {
   STATE,
   STATION_STATUS_LABELS,
   UTILITY_NAMES,
+  copyText,
   escapeHtml,
+  formatDurationSince,
   formatLocalTime,
   formatTimeAgo,
   getSettlementName,
   openBotDeepLink,
+  shareOrCopy,
 } from './state.js';
+
+const UTILITY_PLAIN = {
+  power: 'chiroq (elektr)',
+  water: 'ichimlik suvi',
+  gas: 'gaz',
+};
 
 export function openModal(title, html) {
   document.getElementById('modal-title').textContent = title;
@@ -38,13 +47,33 @@ function buildGroupedOptions(items, labelBuilder) {
     .join('');
 }
 
-// --- Карточка махалли (отправка через Deep Link в бота) ---
+// --- Карточка махалли (длительность, шаринг, прогресс 2/4, контакты диспетчера) ---
 export function openMahallaDetail(mh, incidentsList) {
   const crowdInc = incidentsList.find(i => i.status !== 'planned') || null;
   const plannedInc = incidentsList.find(i => i.status === 'planned') || null;
   const settlementName = getSettlementName(mh.settlement);
+  const utilPlain = UTILITY_PLAIN[STATE.utility] || STATE.utility;
 
-  let html = `<div class="text-xs font-medium text-slate-500 mb-3">${escapeHtml(settlementName)} · ${UTILITY_NAMES[STATE.utility]}</div>`;
+  const durationBadge = crowdInc
+    ? `<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold whitespace-nowrap">⏱ ${escapeHtml(formatDurationSince(crowdInc.created_at || crowdInc.last_report_at))}</span>`
+    : '';
+
+  const shareBtn = crowdInc || plannedInc
+    ? `<button data-action="share" type="button"
+         class="px-2.5 py-1 rounded-full bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-700 text-[11px] font-semibold transition whitespace-nowrap">
+         📤 Ulashish
+       </button>`
+    : '';
+
+  let html = `
+    <div class="flex items-center justify-between gap-2 mb-3">
+      <div class="text-xs font-medium text-slate-500 truncate">${escapeHtml(settlementName)} · ${UTILITY_NAMES[STATE.utility]}</div>
+      <div class="flex items-center gap-1.5 shrink-0">
+        ${durationBadge}
+        ${shareBtn}
+      </div>
+    </div>
+  `;
 
   if (plannedInc) {
     html += `
@@ -58,23 +87,82 @@ export function openMahallaDetail(mh, incidentsList) {
 
   if (crowdInc) {
     const isConf = crowdInc.status === 'confirmed';
-    const cls = isConf ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-amber-50 border-amber-200 text-amber-800';
-    const lbl = isConf ? '🔴 Avariya tasdiqlangan' : '🟠 Tekshirilmoqda (tasdiqlash uchun 4+ xabar kerak)';
+    const count = crowdInc.reports_count || 1;
     const sub = crowdInc.issue_subtype === 'low_pressure' ? ' · Bosim past' : '';
+    const startedAt = formatLocalTime(crowdInc.created_at || crowdInc.last_report_at);
+    const lastAt = formatLocalTime(crowdInc.last_report_at);
+
+    if (isConf) {
+      html += `
+        <div class="p-3.5 rounded-2xl border bg-rose-50 border-rose-200 text-rose-900 mb-3">
+          <div class="flex items-center justify-between gap-2">
+            <div class="font-bold text-sm">🔴 Avariya tasdiqlangan${sub}</div>
+            <span class="px-2 py-0.5 rounded-full bg-rose-200/80 text-rose-900 text-[11px] font-bold shrink-0">${count} kishi</span>
+          </div>
+          <div class="text-xs mt-1.5 opacity-90">
+            Boshlandi: <b>${startedAt}</b> · Oxirgi xabar: ${lastAt}
+          </div>
+          ${crowdInc.street_hint ? `<div class="text-xs mt-1.5 font-medium">📍 Mo‘ljal: ${escapeHtml(crowdInc.street_hint)}</div>` : ''}
+        </div>
+      `;
+    } else {
+      const target = 4;
+      const pct = Math.min(100, Math.round((count / target) * 100));
+      const left = Math.max(1, target - count);
+      html += `
+        <div class="p-3.5 rounded-2xl border bg-amber-50 border-amber-200 text-amber-900 mb-3">
+          <div class="flex items-center justify-between gap-2">
+            <div class="font-bold text-sm">🟠 Tekshirilmoqda${sub}</div>
+            <span class="px-2 py-0.5 rounded-full bg-amber-200/80 text-amber-900 text-[11px] font-bold shrink-0">${count} / ${target} tasdiq</span>
+          </div>
+          <div class="w-full h-1.5 rounded-full bg-amber-200/70 overflow-hidden mt-2">
+            <div class="h-full rounded-full bg-amber-500 transition-all" style="width:${pct}%"></div>
+          </div>
+          <div class="text-xs mt-2 opacity-90">
+            Boshlandi: <b>${startedAt}</b> · Yana <b>${left}</b> kishi tasdiqlasa qizil bo‘ladi
+          </div>
+          ${crowdInc.street_hint ? `<div class="text-xs mt-1.5 font-medium">📍 Mo‘ljal: ${escapeHtml(crowdInc.street_hint)}</div>` : ''}
+        </div>
+      `;
+    }
 
     html += `
-      <div class="p-3.5 rounded-2xl border ${cls} mb-3">
-        <div class="font-bold text-sm">${lbl}${sub}</div>
-        <div class="text-xs mt-1.5 opacity-90">
-          Tasdiqlaganlar: <b>${crowdInc.reports_count}</b> kishi · Oxirgi xabar: ${formatLocalTime(crowdInc.last_report_at)}
-        </div>
-        ${crowdInc.street_hint ? `<div class="text-xs mt-1.5 font-medium">📍 Mo‘ljal: ${escapeHtml(crowdInc.street_hint)}</div>` : ''}
-      </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 mb-3">
         <button data-bot-payload="rep-${STATE.utility}-${crowdInc.issue_subtype}-${mh.id}" type="button"
           class="flex-1 py-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-semibold text-xs transition">📍 + Tasdiqlash</button>
         <button data-bot-payload="res-${STATE.utility}-${mh.id}" type="button"
           class="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs transition">✓ Hal bo‘ldi</button>
+      </div>
+    `;
+
+    // Быстрый блок звонка в диспетчерскую + копирование готового обращения
+    const isXonobod = mh.settlement === 'xonobod';
+    html += `
+      <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <span class="font-bold text-slate-700">📞 Dispetcherga xabar berish</span>
+          <button data-action="copy-dispatch" type="button"
+            class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700 transition">
+            📋 Matnni nusxalash
+          </button>
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+          <a href="tel:1055"
+            class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-sky-50 border border-slate-200 font-semibold text-slate-800 transition">
+            📞 1055
+          </a>
+          ${isXonobod ? `
+            <a href="tel:+998331001184"
+              class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-sky-50 border border-sky-200 font-semibold text-sky-800 transition">
+              🏢 33-100-11-84
+            </a>
+            <a href="tel:+998937820367"
+              class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-sky-50 border border-sky-200 font-semibold text-sky-800 transition">
+              🏢 93-782-03-67
+            </a>
+          ` : ''}
+        </div>
+        ${isXonobod ? '<div class="text-[10.5px] text-slate-400">🏢 Boshqaruv tashkiloti (ko‘p qavatli uylar) · 1055 (umumiy dispetcher)</div>' : ''}
       </div>
     `;
   } else {
@@ -108,10 +196,43 @@ export function openMahallaDetail(mh, incidentsList) {
   const body = openModal(`${mh.name_uz} MFY`, html);
 
   body.addEventListener('click', e => {
-    const btn = e.target.closest('[data-bot-payload]');
-    if (!btn) return;
-    openBotDeepLink(btn.dataset.botPayload);
-    closeModal();
+    const botBtn = e.target.closest('[data-bot-payload]');
+    if (botBtn) {
+      openBotDeepLink(botBtn.dataset.botPayload);
+      closeModal();
+      return;
+    }
+
+    const actionBtn = e.target.closest('[data-action]');
+    if (!actionBtn) return;
+
+    if (actionBtn.dataset.action === 'share') {
+      const hintPart = crowdInc?.street_hint ? ` (${crowdInc.street_hint})` : '';
+      let shareText;
+      if (crowdInc) {
+        const issueTxt = crowdInc.issue_subtype === 'low_pressure'
+          ? 'gaz bosimi juda past'
+          : `${utilPlain} uzildi`;
+        shareText = `⚠️ ${mh.name_uz} MFY${hintPart}da ${issueTxt} (${crowdInc.reports_count} kishi xabar berdi). Sizda ham shundaymi? Xaritada tasdiqlang:`;
+      } else {
+        const notePart = plannedInc?.note ? ` (${plannedInc.note})` : '';
+        shareText = `🟣 ${mh.name_uz} MFYda ${utilPlain} bo‘yicha rejali texnik ishlar${notePart}. Jonli xarita:`;
+      }
+      shareOrCopy(shareText, 'https://xonobodbugun.uz');
+      return;
+    }
+
+    if (actionBtn.dataset.action === 'copy-dispatch' && crowdInc) {
+      const hintPart = crowdInc.street_hint ? `, ${crowdInc.street_hint} atrofida` : 'da';
+      const issueTxt = crowdInc.issue_subtype === 'low_pressure'
+        ? 'gaz bosimi juda past'
+        : `${utilPlain} yo‘q`;
+      const startedAt = formatLocalTime(crowdInc.created_at || crowdInc.last_report_at);
+      const dispatchText =
+        `Assalomu alaykum! ${settlementName}, ${mh.name_uz} MFY${hintPart} ${startedAt} dan beri ${issueTxt} ` +
+        `(${crowdInc.reports_count} nafar aholi tasdiqladi). Tekshirib amaliy yordam berishingizni so‘raymiz.`;
+      copyText(dispatchText, 'Murojaat matni nusxalandi!');
+    }
   });
 }
 
@@ -425,8 +546,29 @@ export function openContactModal() {
           class="block w-full text-center py-3 rounded-xl bg-[#2ca7f2] hover:bg-[#1e96e0] text-white font-semibold text-sm transition">
           🤖 @${BOT_USERNAME} ga o‘tish
         </a>
-        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-600">
-          <b>Favqulodda raqam:</b> 1055 (Kommunal xizmatlar dispetcherlik markazi)
+
+        <div class="p-3 rounded-xl bg-sky-50 border border-sky-200 text-slate-700 space-y-2">
+          <div class="font-bold text-slate-900">🏢 Boshqaruv tashkiloti (ko‘p qavatli uylar)</div>
+          <div class="text-[11px] text-slate-500">
+            Xonobod shahrida elektr, suv, issiqlik, yerto‘la, tom va kirish yo‘laklari bo‘yicha ishonch telefonlari:
+          </div>
+          <div class="grid grid-cols-2 gap-2 pt-0.5">
+            <a href="tel:+998331001184"
+              class="py-2 px-2.5 rounded-lg bg-white border border-sky-200 hover:bg-sky-100 text-sky-800 font-semibold text-center transition">
+              📞 33-100-11-84
+            </a>
+            <a href="tel:+998937820367"
+              class="py-2 px-2.5 rounded-lg bg-white border border-sky-200 hover:bg-sky-100 text-sky-800 font-semibold text-center transition">
+              📞 93-782-03-67
+            </a>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-between gap-2">
+          <span><b>Favqulodda dispetcherlik:</b></span>
+          <a href="tel:1055" class="px-3 py-1 rounded-lg bg-white border border-slate-200 font-bold text-slate-800 hover:bg-slate-100">
+            📞 1055
+          </a>
         </div>
       </div>
     `
