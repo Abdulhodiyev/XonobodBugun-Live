@@ -168,3 +168,4 @@ cython_debug/
 backups/
 .DS_Store
 uploads/
+tailwindcss.exe

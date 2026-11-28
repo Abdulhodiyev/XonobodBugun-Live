@@ -82,11 +82,22 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
+ALLOWED_ORIGINS = [
+    "https://xonobodbugun.uz",
+    "https://www.xonobodbugun.uz",
+]
+if settings.run_bot_in_app:
+    # Локальная разработка
+    ALLOWED_ORIGINS.extend([
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+    ])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 app.include_router(api_router)
