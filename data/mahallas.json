@@ -46,16 +46,16 @@
     { "id": "sul_yangi_obod", "settlement": "sultonobod", "name_uz": "Yangi Obod", "center": [40.774359, 72.986499] },
     { "id": "sul_jannatbuloq", "settlement": "sultonobod", "name_uz": "Jannatbuloq", "center": [40.773783, 72.977272] }
   ],
-  "stations": [
-      { "id": "st_xon_metan_1", "settlement": "xonobod", "name_uz": "Metan", "fuel": "metan", "center": [40.796414, 72.985927] },
-      { "id": "st_xon_propan_1", "settlement": "xonobod", "name_uz": "Propan", "fuel": "propan", "center": [40.796507, 72.985123] },
-      { "id": "st_xon_benzin_1", "settlement": "xonobod", "name_uz": "Benzin (1)", "fuel": "benzin", "center": [40.794588, 72.991339] },
-      { "id": "st_xon_benzin_2", "settlement": "xonobod", "name_uz": "Benzin (2)", "fuel": "benzin", "center": [40.799692, 72.978505] },
-      { "id": "st_xon_benzin_oyazim", "settlement": "xonobod", "name_uz": "OYAZIM (Benzin)", "fuel": "benzin", "center": [40.79563, 72.98825] },
+"stations": [
+    { "id": "st_xon_metan_1", "settlement": "xonobod", "name_uz": "Metan", "fuel": "metan", "center": [40.796414, 72.985927] },
+    { "id": "st_xon_propan_1", "settlement": "xonobod", "name_uz": "Propan", "fuel": "propan", "center": [40.796507, 72.985123] },
+    { "id": "st_xon_benzin_1", "settlement": "xonobod", "name_uz": "Benzin (1)", "fuel": "benzin", "center": [40.794588, 72.991339] },
+    { "id": "st_xon_benzin_2", "settlement": "xonobod", "name_uz": "Benzin (2)", "fuel": "benzin", "center": [40.799692, 72.978505] },
+    { "id": "st_xon_benzin_oyazim", "settlement": "xonobod", "name_uz": "OYAZIM (Benzin)", "fuel": "benzin", "center": [40.79563, 72.98825] },
 
-      { "id": "st_sul_benzin_1", "settlement": "sultonobod", "name_uz": "Benzin (Sultonobod)", "fuel": "benzin", "center": [40.764736, 72.959008] },
-      { "id": "st_sul_metan_sayilgoh", "settlement": "sultonobod", "name_uz": "Metan (Sayilgoh yo‘li)", "fuel": "metan", "center": [40.744399, 72.915244] },
-      { "id": "st_sul_metan_mingchinor", "settlement": "sultonobod", "name_uz": "Mingchinor (Metan)", "fuel": "metan", "center": [40.7692, 72.9924] },
-      { "id": "st_sul_propan_mingchinor", "settlement": "sultonobod", "name_uz": "Mingchinor (Propan)", "fuel": "propan", "center": [40.7688, 72.9927] }
-    ]
+    { "id": "st_sul_benzin_1", "settlement": "sultonobod", "name_uz": "Benzin (Sultonobod)", "fuel": "benzin", "center": [40.764736, 72.959008] },
+    { "id": "st_sul_metan_sayilgoh", "settlement": "sultonobod", "name_uz": "Metan (Sayilgoh yo‘li)", "fuel": "metan", "center": [40.744399, 72.915244] },
+    { "id": "st_sul_metan_mingchinor", "settlement": "sultonobod", "name_uz": "Mingchinor (Metan)", "fuel": "metan", "center": [40.774236, 72.999347] },
+    { "id": "st_sul_propan_mingchinor", "settlement": "sultonobod", "name_uz": "Mingchinor (Propan)", "fuel": "propan", "center": [40.773986, 72.999647] }
+  ]
 }
